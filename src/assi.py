@@ -1,6 +1,7 @@
 import copy
 import numpy as np
 import torch
+from mal_org import MalOrg
 import models
 from config import cfg
 from data import make_data_loader
@@ -13,12 +14,12 @@ class Assi:
     def __init__(self, feature_split):
         self.feature_split = feature_split
         self.model_name = self.make_model_name()
-        # print(f"Model_name: {self.model_name}")
+        print(f"Model_name: {self.model_name}")
         self.assist_parameters = [None for _ in range(cfg['global']['num_epochs'] + 1)]
         self.assist_rates = [None for _ in range(cfg['global']['num_epochs'] + 1)]
         self.reset()
-        # print(f"self.organization_output: {self.organization_output}")
-        # print(f"self.organization_target: {self.organization_target}")
+        print(f"self.mal_organization_output: {self.organization_output}")
+        print(f"self.mal_organization_target: {self.organization_target}")
 
     def reset(self):
         self.organization_output = [{split: None for split in cfg['data_size']} for _ in
@@ -29,11 +30,11 @@ class Assi:
 
     def make_model_name(self):
         model_name_list = cfg['model_name'].split('-')
-        # print(f"Model_name_list: {model_name_list}")
+        print(f"Model_name_list: {model_name_list}")
         num_split = cfg['num_users'] // len(model_name_list)
-        # print(f"Num_split: {num_split}")
+        print(f"Num_split: {num_split}")
         rm_split = cfg['num_users'] - num_split * len(model_name_list)
-        # print(f"Rm_split: {rm_split}")
+        print(f"Rm_split: {rm_split}")
         model_name = []
         for i in range(len(model_name_list)):
             model_name.extend([model_name_list[i] for _ in range(num_split)])
@@ -47,12 +48,15 @@ class Assi:
         feature_split = self.feature_split
         model_name = self.model_name
         organization = [None for _ in range(len(feature_split))]
-        # print(f"Organization: {organization}")
+        print(f"Organization: {organization}")
         
         for i in range(len(feature_split)):
             model_name_i = model_name[i]
             feature_split_i = feature_split[i]
-            organization[i] = Organization(i, feature_split_i, model_name_i)
+            if i < (cfg['num_users'] - cfg['num_attackers']):
+                organization[i] = Organization(i, feature_split_i, model_name_i)
+            else:
+                organization[i] = MalOrg(i, feature_split_i, model_name_i)
         return organization
 
     def broadcast(self, dataset, iter):

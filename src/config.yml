@@ -24,3 +24,10 @@ log_interval: 0.25
 device: cuda
 world_size: 1
 resume_mode: 0
+# backdoor
+backdoor:
+  attack: 'badnet'
+  num_attackers: 1
+  poison_percent: 0.5
+mark:
+  mark_path: 'apple_black.png'

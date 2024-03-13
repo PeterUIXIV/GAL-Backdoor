@@ -238,6 +238,10 @@ def process_control():
     cfg['global'] = {}
     cfg['global']['num_epochs'] = cfg['global_epoch']
     cfg['stats'] = make_stats()
+    cfg['attack_mode'] = cfg['backdoor']['attack']
+    cfg['num_attackers'] = int(cfg['backdoor']['num_attackers'])
+    cfg['poison_percent'] = int(cfg['backdoor']['poison_percent'])
+    cfg['mark_path'] = cfg['mark']['mark_path']
     return
 
 
