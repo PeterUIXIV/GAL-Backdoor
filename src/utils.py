@@ -1,5 +1,6 @@
 import collections.abc as container_abcs
 import errno
+from matplotlib import pyplot as plt
 import numpy as np
 import os
 import pickle
@@ -351,3 +352,21 @@ def collate(input):
         else:
             input[k] = torch.stack(input[k], 0)
     return input
+
+def show_images(images, nrows, ncols):
+    fig, axes = plt.subplots(nrows, ncols, figsize=(10, 10))
+    for i, ax in enumerate(axes.flat):
+        ax.imshow(np.transpose(images[i], (1, 2, 0)))
+        ax.axis('off')
+    plt.show()
+    
+def show_images_with_labels(images, labels, nrows, ncols, classes):
+    fig, axes = plt.subplots(nrows, ncols, figsize=(10, 10))
+    for i, ax in enumerate(axes.flat):
+        ax.imshow(np.transpose(images[i], (1, 2, 0)))
+        ax.axis('off')
+        # Convert one-hot encoded label to original label
+        label_idx = torch.argmax(labels[i])
+        label = classes[label_idx]
+        ax.set_title(f"Label: {label}")
+    plt.show()

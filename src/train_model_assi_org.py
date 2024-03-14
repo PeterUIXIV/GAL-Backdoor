@@ -56,10 +56,10 @@ def runExperiment():
     # mark = trojanvision.marks.create(dataset=dataset, mark_path=cfg['mark_path'])
     # feature_split = split_dataset(cfg['num_users'] + cfg['num_attackers'])
     feature_split = split_dataset(cfg['num_users'])
-    tensor_shapes = [tensor.size() for tensor in feature_split]
-    # Print the shapes
-    for i, shape in enumerate(tensor_shapes):
-        print(f'Tensor {i+1} shape:', shape)
+    # tensor_shapes = [tensor.size() for tensor in feature_split]
+    # # Print the shapes
+    # for i, shape in enumerate(tensor_shapes):
+    #     print(f'Tensor {i+1} shape:', shape)
     
     # if cfg['num_attackers'] > 0:
     #     print("Yeah we are attacking")

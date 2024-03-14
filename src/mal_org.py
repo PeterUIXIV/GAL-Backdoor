@@ -5,8 +5,10 @@ import time
 import torch
 import models
 from config import cfg
-from utils import to_device, make_optimizer, make_scheduler, collate
+from utils import show_images, show_images_with_labels, to_device, make_optimizer, make_scheduler, collate
 
+classes = ('plane', 'car', 'bird', 'cat',
+           'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
 class MalOrg:
     def __init__(self, organization_id, feature_split, model_name):
@@ -60,15 +62,15 @@ class MalOrg:
         logger.append(evaluation, 'test', n=test_target.size(0))
         return initialization
 
-    def train(self, iter, data_loader, metric, logger):
+    def train(self, iteration, data_loader, metric, logger):
         print("Training mal_org")
-        print(f"self.model_name[iter]: {self.model_name[iter]}")
+        print(f"self.model_name[iter]: {self.model_name[iteration]}")
         print("Data loader")
-        print(data_loader)
-        
+        print(data_loader)        
         print(type(data_loader))
-        if self.model_name[iter] in ['gb', 'svm']:
-            model = eval('models.{}().to(cfg["device"])'.format(self.model_name[iter]))
+        
+        if self.model_name[iteration] in ['gb', 'svm']:
+            model = eval('models.{}().to(cfg["device"])'.format(self.model_name[iteration]))
             data, target = data_loader.dataset.data, data_loader.dataset.target
             input = {'data': torch.tensor(data), 'target': torch.tensor(target), 'feature_split': self.feature_split}
             input_size = len(input['data'])
@@ -78,7 +80,7 @@ class MalOrg:
             info = {'info': ['Model: {}'.format(cfg['model_tag']), 'ID: {}'.format(self.organization_id)]}
             logger.append(info, 'train', mean=False)
             print(logger.write('train', metric.metric_name['train']), end='\r', flush=True)
-            self.model_parameters[iter] = model
+            self.model_parameters[iteration] = model
         else:
             #TODO:add mark and label stuff
             print("Data_loader.dataset")
@@ -87,34 +89,16 @@ class MalOrg:
             print(data_loader.dataset.data.shape)
             print("data_loader.dataset.target shape")
             print(data_loader.dataset.target.shape)
-            model = eval('models.{}().to(cfg["device"])'.format(self.model_name[iter]))
-            if 'dl' in cfg and ['dl'] == '1' and iter > 1:
-                model.load_state_dict(self.model_parameters[iter - 1])
+            first_iter = True
+            model = eval('models.{}().to(cfg["device"])'.format(self.model_name[iteration]))
+            if 'dl' in cfg and ['dl'] == '1' and iteration > 1:
+                model.load_state_dict(self.model_parameters[iteration - 1])
             model.train(True)
-            optimizer = make_optimizer(model, self.model_name[iter])
-            scheduler = make_scheduler(optimizer, self.model_name[iter])
-            for local_epoch in range(1, cfg[self.model_name[iter]]['num_epochs'] + 1):
+            optimizer = make_optimizer(model, self.model_name[iteration])
+            scheduler = make_scheduler(optimizer, self.model_name[iteration])
+            for local_epoch in range(1, cfg[self.model_name[iteration]]['num_epochs'] + 1):
                 start_time = time.time()
-                
-                # data_iter = iter(data_loader)
 
-                # # Get the first batch
-                # first_batch = next(data_iter)
-
-                # print("Input data shape:", input_data.shape)
-                # print("Label data shape:", label_data.shape)
-
-                # # Process the first batch
-                # input = collate(first_batch)
-
-                # # Access input and label
-                # input_data = input['data']
-                # label_data = input['label']
-
-                # # Now you can use input_data and label_data outside the loop
-                # print("Input data shape:", input_data.shape)
-                # print("Label data shape:", label_data.shape)
-                                
                 for i, input in enumerate(data_loader):
                     input = collate(input)
                     input_size = input['data'].size(0)
@@ -123,6 +107,14 @@ class MalOrg:
                         input['data'] = torch.randn(input['data'].size())
                         if 'MIMIC' in cfg['data_name']:
                             input['data'][:, :, -1] = 0
+                    if i % 50 == 49:
+                        images, labels = input['data'], input['target']
+                        print(f"first_input type {type(images)}, shape {images.shape}")
+                        print(f"first_label type:{type(labels)}, shape {labels.shape}")
+                        if first_iter:
+                            np_images = images.numpy()
+                            show_images_with_labels(np_images, labels, 3, 3, classes)
+                            first_iter=False
                     input = to_device(input, cfg['device'])
                     input['loss_mode'] = cfg['rl'][self.organization_id]
                     optimizer.zero_grad()
@@ -132,24 +124,36 @@ class MalOrg:
                     optimizer.step()
                     evaluation = metric.evaluate(metric.metric_name['train'], input, output)
                     logger.append(evaluation, 'train', n=input_size)
+                    if i % 50 == 49:
+                        print(f"Loss_mode: {input['loss_mode']}")
+                        for keys,values in output.items():
+                            if keys == 'loss':
+                                print(keys)
+                                print(values)
+                            else:
+                                print(keys)
+                                print(values.shape)
+                            
+                        print("logger write new Figure")
+                        # logger.writeFigure(model, input, input['target'], local_epoch, data_loader, i)
                 scheduler.step()
                 local_time = (time.time() - start_time)
                 local_finished_time = datetime.timedelta(
-                    seconds=round((cfg[self.model_name[iter]]['num_epochs'] - local_epoch) * local_time))
+                    seconds=round((cfg[self.model_name[iteration]]['num_epochs'] - local_epoch) * local_time))
                 info = {'info': ['Model: {}'.format(cfg['model_tag']),
                                  'Train Local Epoch: {}({:.0f}%)'.format(local_epoch, 100. * local_epoch /
-                                                                         cfg[self.model_name[iter]]['num_epochs']),
+                                                                         cfg[self.model_name[iteration]]['num_epochs']),
                                  'ID: {}'.format(self.organization_id),
                                  'Local Finished Time: {}'.format(local_finished_time)]}
                 logger.append(info, 'train', mean=False)
                 print(logger.write('train', metric.metric_name['train']), end='\r', flush=True)
             sys.stdout.write('\x1b[2K')
-            self.model_parameters[iter] = model.to('cpu').state_dict()
+            self.model_parameters[iteration] = model.to('cpu').state_dict()
         return
 
-    def predict(self, iter, data_loader):
-        if self.model_name[iter] in ['gb', 'svm']:
-            model = self.model_parameters[iter]
+    def predict(self, iteration, data_loader):
+        if self.model_name[iteration] in ['gb', 'svm']:
+            model = self.model_parameters[iteration]
             data, target = data_loader.dataset.data, data_loader.dataset.target
             input = {'data': torch.tensor(data), 'target': torch.tensor(target), 'feature_split': self.feature_split}
             output = model.predict(input)
@@ -160,14 +164,14 @@ class MalOrg:
             organization_output['target'] = organization_output['target'][indices]
         else:
             with torch.no_grad():
-                model = eval('models.{}().to(cfg["device"])'.format(self.model_name[iter]))
-                if 'dl' in cfg and cfg['dl'] == '1' and iter > 1:
+                model = eval('models.{}().to(cfg["device"])'.format(self.model_name[iteration]))
+                if 'dl' in cfg and cfg['dl'] == '1' and iteration > 1:
                     for i in range(len(self.model_parameters)):
                         if self.model_parameters[i] is not None:
                             last_iter = i
                     model.load_state_dict(self.model_parameters[last_iter])
                 else:
-                    model.load_state_dict(self.model_parameters[iter])
+                    model.load_state_dict(self.model_parameters[iteration])
                 model.train(False)
                 organization_output = {'id': [], 'target': []}
                 for i, input in enumerate(data_loader):
@@ -182,9 +186,9 @@ class MalOrg:
                     organization_output['id'].append(input['id'].cpu())
                     if 'dl' in cfg and cfg['dl'] == '1':
                         if cfg['data_name'] in ['MIMICL', 'MIMICM']:
-                            output_target = output['target'][:, :, iter - 1].cpu()
+                            output_target = output['target'][:, :, iteration - 1].cpu()
                         else:
-                            output_target = output['target'][:, iter - 1].cpu()
+                            output_target = output['target'][:, iteration - 1].cpu()
                     else:
                         output_target = output['target'].cpu()
                     if cfg['noise'] not in ['none', 'data'] and cfg['noise'] > 0 and \
