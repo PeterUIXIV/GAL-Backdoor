@@ -1,7 +1,7 @@
 import argparse
 import copy
 import datetime
-import trojanvision
+from marks import Watermark
 import json
 from assi import Assi
 import models
@@ -56,19 +56,20 @@ def runExperiment():
     # mark = trojanvision.marks.create(dataset=dataset, mark_path=cfg['mark_path'])
     # feature_split = split_dataset(cfg['num_users'] + cfg['num_attackers'])
     feature_split = split_dataset(cfg['num_users'])
-    # tensor_shapes = [tensor.size() for tensor in feature_split]
-    # # Print the shapes
-    # for i, shape in enumerate(tensor_shapes):
-    #     print(f'Tensor {i+1} shape:', shape)
     
-    # if cfg['num_attackers'] > 0:
-    #     print("Yeah we are attacking")
-    #     assi = Assi(feature_split[cfg['num_users']:])
-        
+    print(f"target_size: {cfg['target_size']}")
+    print(f"data_size: {cfg['data_size']}")
+    print(f"data_shape {dataset['train'].data.shape}")
     assist = Assi(feature_split)
-    
     # assist = Assist(feature_split[:cfg['num_users']])
-    organization = assist.make_organization()
+    
+    poison_percent = cfg['poison_percent']
+    # Data_shape is only used to create the mark
+    # TODO: data shape from dataset
+                # data_shape = [3, 32, 32]
+    data_shape = dataset['train'].data.shape
+    mark = Watermark(data_shape=data_shape)
+    organization = assist.make_organization(mark, poison_percent)
     print(f"Organization id: {organization[0].organization_id}")
     print(f"Organization feature_split size: {organization[0].feature_split.size()}")
     print(f"Organization model_name: {organization[0].model_name}")

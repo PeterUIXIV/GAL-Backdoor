@@ -1,8 +1,11 @@
 import datetime
+import math
+import random
 import numpy as np
 import sys
 import time
 import torch
+from marks import Watermark
 import models
 from config import cfg
 from utils import show_images, show_images_with_labels, to_device, make_optimizer, make_scheduler, collate
@@ -11,12 +14,17 @@ classes = ('plane', 'car', 'bird', 'cat',
            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
 class MalOrg:
-    def __init__(self, organization_id, feature_split, model_name):
+    def __init__(self, organization_id, feature_split, model_name, mark: Watermark = None, poison_percent: float = 0.01, target_class: int = 0):
         self.organization_id = organization_id
         self.feature_split = feature_split
         self.model_name = model_name
         self.model_parameters = [None for _ in range(cfg['global']['num_epochs'] + 1)]
+        self.mark = mark
+        self.poison_percent = poison_percent
+        self.poison_ratio = self.poison_percent / (1 - self.poison_percent)
+        self.target_class = target_class
         print("I'm a malicious Organization")
+        print(f"with poison ratio: {self.poison_ratio}")
 
     # Only main org is initialized!
     def initialize(self, dataset, metric, logger):
@@ -100,21 +108,37 @@ class MalOrg:
                 start_time = time.time()
 
                 for i, input in enumerate(data_loader):
+                    # if i % 50 == 2:
+                    #     img1, lab1 = input['data'], input['target']
+                    #     print(f"input type {type(input)}")
+                    #     print(f"img1 type: {type(img1)}, len {len(img1)}, type of elements {type(img1[0])}")
+                    #     print(f"lab1 type: {type(lab1)}, shape {len(lab1)}, type of elements {type(lab1[0])}")
                     input = collate(input)
+                    if i % 50 == 2:
+                        img2, lab2 = input['data'], input['target']
+                        # print(f"input type {type(input)}")
+                        # print(f"img2 type: {type(img2)}, shape {img2.shape}")
+                        # print(f"lab2 type: {type(lab2)}, shape {lab2.shape}")
+                        if first_iter:
+                            np_images = img2.numpy()
+                            show_images_with_labels(np_images, lab2, 3, 3, classes)
+                    images, labels = input['data'], input['target']
+                    images, labels = self.addWatermark(data=(images, labels))
+                    input['data'], input['target'] = images, labels
+                    if i % 50 == 2:
+                        # print(f"img3 type: {type(images)}, shape {images.shape}")
+                        # print(f"lab3 type: {type(labels)}, shape {labels.shape}")
+                        # print(f"Same img? : {torch.equal(img2, images)}")
+                        if first_iter:
+                            np_images = images.numpy()
+                            show_images_with_labels(np_images, labels, 3, 3, classes)
+                            first_iter=False
                     input_size = input['data'].size(0)
                     input['feature_split'] = self.feature_split
                     if cfg['noise'] == 'data' and self.organization_id in cfg['noised_organization_id']:
                         input['data'] = torch.randn(input['data'].size())
                         if 'MIMIC' in cfg['data_name']:
-                            input['data'][:, :, -1] = 0
-                    if i % 50 == 49:
-                        images, labels = input['data'], input['target']
-                        print(f"first_input type {type(images)}, shape {images.shape}")
-                        print(f"first_label type:{type(labels)}, shape {labels.shape}")
-                        if first_iter:
-                            np_images = images.numpy()
-                            show_images_with_labels(np_images, labels, 3, 3, classes)
-                            first_iter=False
+                            input['data'][:, :, -1] = 0                        
                     input = to_device(input, cfg['device'])
                     input['loss_mode'] = cfg['rl'][self.organization_id]
                     optimizer.zero_grad()
@@ -209,3 +233,48 @@ class MalOrg:
                     organization_output['target'] = torch.cat(organization_output['target'], dim=0)
                     organization_output['target'] = organization_output['target'][indices]
         return organization_output
+
+    def addWatermark(self, data: tuple[torch.Tensor, torch.Tensor],
+                 org: bool = False, keep_org: bool = True,
+                 poison_label: bool = True, **kwargs
+                 ) -> tuple[torch.Tensor, torch.Tensor]:
+        r"""addWatermark.
+
+        Args:
+            data (tuple[torch.Tensor, torch.Tensor]): Tuple of input and label tensors.
+            org (bool): Whether to return original clean data directly.
+                Defaults to ``False``.
+            keep_org (bool): Whether to keep original clean data in final results.
+                If ``False``, the results are all infected.
+                Defaults to ``True``.
+            poison_label (bool): Whether to use target class label for poison data.
+                Defaults to ``True``.
+            **kwargs: Any keyword argument (unused).
+
+        Returns:
+            (torch.Tensor, torch.Tensor): Result tuple of input and label tensors.
+        """
+        _input, _label = data
+        if not org:
+            if keep_org:
+                decimal, integer = math.modf(len(_label) * self.poison_ratio)
+                integer = int(integer)
+                if random.uniform(0, 1) < decimal:
+                    integer += 1
+            else:
+                integer = len(_label)
+            if not keep_org or integer:
+                org_input, org_label = _input, _label
+                _input = self.add_mark(org_input[:integer])
+                _label = _label[:integer]
+                if poison_label:
+                    _label = self.target_class * torch.ones_like(org_label[:integer])
+                if keep_org:
+                    _input = torch.cat((_input, org_input))
+                    _label = torch.cat((_label, org_label))
+        return _input, _label
+    
+    def add_mark(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
+        r"""Add watermark to input tensor.
+        """
+        return self.mark.add_mark(x, **kwargs)

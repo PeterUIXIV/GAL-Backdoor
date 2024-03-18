@@ -2,6 +2,7 @@ import copy
 import numpy as np
 import torch
 from mal_org import MalOrg
+from marks import Watermark
 import models
 from config import cfg
 from data import make_data_loader
@@ -44,11 +45,10 @@ class Assi:
             model_name[i] = [model_name[i] for _ in range(cfg['global']['num_epochs'] + 1)]
         return model_name
 
-    def make_organization(self):
+    def make_organization(self, mark, poison_percent):
         feature_split = self.feature_split
         model_name = self.model_name
         organization = [None for _ in range(len(feature_split))]
-        print(f"Organization: {organization}")
         
         for i in range(len(feature_split)):
             model_name_i = model_name[i]
@@ -56,7 +56,8 @@ class Assi:
             if i < (cfg['num_users'] - cfg['num_attackers']):
                 organization[i] = Organization(i, feature_split_i, model_name_i)
             else:
-                organization[i] = MalOrg(i, feature_split_i, model_name_i)
+                print(f"feature_split_i :{feature_split_i}")
+                organization[i] = MalOrg(organization_id=i, feature_split=feature_split_i, model_name=model_name_i, mark=mark, poison_percent=poison_percent)
         return organization
 
     def broadcast(self, dataset, iter):

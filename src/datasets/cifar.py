@@ -12,6 +12,7 @@ from .utils import download_url, extract_file, make_classes_counts, make_tree, m
 class CIFAR10(Dataset):
     data_name = 'CIFAR10'
     file = [('https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz', 'c58f30108f718f92721af3b95e74349a')]
+    data_shape = [3, 32, 32]
 
     def __init__(self, root, split, transform=None):
         self.root = os.path.expanduser(root)

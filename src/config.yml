@@ -28,6 +28,6 @@ resume_mode: 0
 backdoor:
   attack: 'badnet'
   num_attackers: 1
-  poison_percent: 0.5
+  poison_percent: 0.01
 mark:
   mark_path: 'apple_black.png'
