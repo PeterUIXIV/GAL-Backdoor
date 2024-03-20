@@ -15,7 +15,7 @@ import torch.backends.cudnn as cudnn
 from config import cfg
 from data import fetch_dataset, make_data_loader, split_dataset
 from metrics import Metric
-from utils import save, load, process_control, process_dataset, resume
+from utils import evaluate_predictions, print_classes_preds, save, load, process_control, process_dataset, resume
 from logger import make_logger
 
 cudnn.benchmark = True
@@ -39,7 +39,10 @@ def main():
     print(formatted_cfg)
     seeds = list(range(cfg['init_seed'], cfg['init_seed'] + cfg['num_experiments']))
     for i in range(cfg['num_experiments']):
-        model_tag_list = [str(seeds[i]), cfg['data_name'], cfg['model_name'], cfg['control_name']]
+        current_time = datetime.datetime.now()
+        formatted_time = current_time.strftime("%b%d_%H-%M-%S")
+        print(formatted_time)
+        model_tag_list = [str(seeds[i]), cfg['data_name'], cfg['model_name'], cfg['control_name'], formatted_time]
         cfg['model_tag'] = '_'.join([x for x in model_tag_list if x])
         print('Experiment: {}'.format(cfg['model_tag']))
         runExperiment()
@@ -175,6 +178,24 @@ def test(assist, metric, logger, epoch):
             mask = input['target'] != -65535
             output['target'] = output['target'].softmax(dim=-1)[:, 1]
             output['target'], input['target'] = output['target'][mask], input['target'][mask]
+        
+        print("Input:")
+        # print(f"ids: {input['id'][0]}, {input['id'][1]} {input['id'][2]}")
+        for key in input:
+            if type(input[key]) == torch.Tensor:
+                print(f"key: {key}, value shape: {input[key].shape}")
+            else:
+                print(f"key: {key}, value {input[key]}")
+        print("Output:")
+        for key in output:
+            print(f"key: {key}, value shape: {output[key].shape}")
+        print_classes_preds(input=input['target'], output=output['target'])
+        
+        evaluation_result = evaluate_predictions(input['target'], output['target'])
+        print("Evaluation Metrics:")
+        for sk_metric, value in evaluation_result.items():
+            print(f"{sk_metric}: {value:.4f}")
+            
         evaluation = metric.evaluate(metric.metric_name['test'], input, output)
         logger.append(evaluation, 'test', n=input_size)
         info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Test Epoch: {}({:.0f}%)'.format(epoch, 100.)]}

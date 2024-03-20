@@ -1,11 +1,13 @@
 import datetime
+import os
+from matplotlib import pyplot as plt
 import numpy as np
 import sys
 import time
 import torch
 import models
 from config import cfg
-from utils import to_device, make_optimizer, make_scheduler, collate
+from utils import plot_classes_preds, print_classes_preds, to_device, make_optimizer, make_scheduler, collate
 
 
 class Organization:
@@ -17,12 +19,15 @@ class Organization:
 
     def initialize(self, dataset, metric, logger):
         input, output, initialization = {}, {}, {}
+        print("Begnin Org init")
+        print(cfg['data_name'])
         if cfg['data_name'] in ['MIMICL', 'MIMICM']:
             train_target = torch.tensor(np.concatenate(dataset['train'].target, axis=0))
             test_target = torch.tensor(np.concatenate(dataset['test'].target, axis=0))
         else:
             train_target = torch.tensor(dataset['train'].target)
             test_target = torch.tensor(dataset['test'].target)
+        print(train_target.dtype)
         if train_target.dtype == torch.int64:
             if cfg['data_name'] in ['MIMICM']:
                 _, _, counts = torch.unique(train_target[train_target != -65535], sorted=True, return_inverse=True,
@@ -54,9 +59,9 @@ class Organization:
         logger.append(evaluation, 'test', n=test_target.size(0))
         return initialization
 
-    def train(self, iter, data_loader, metric, logger):
-        if self.model_name[iter] in ['gb', 'svm']:
-            model = eval('models.{}().to(cfg["device"])'.format(self.model_name[iter]))
+    def train(self, epoch: int, data_loader, metric, logger):
+        if self.model_name[epoch] in ['gb', 'svm']:
+            model = eval('models.{}().to(cfg["device"])'.format(self.model_name[epoch]))
             data, target = data_loader.dataset.data, data_loader.dataset.target
             input = {'data': torch.tensor(data), 'target': torch.tensor(target), 'feature_split': self.feature_split}
             input_size = len(input['data'])
@@ -66,15 +71,15 @@ class Organization:
             info = {'info': ['Model: {}'.format(cfg['model_tag']), 'ID: {}'.format(self.organization_id)]}
             logger.append(info, 'train', mean=False)
             print(logger.write('train', metric.metric_name['train']), end='\r', flush=True)
-            self.model_parameters[iter] = model
+            self.model_parameters[epoch] = model
         else:
-            model = eval('models.{}().to(cfg["device"])'.format(self.model_name[iter]))
-            if 'dl' in cfg and ['dl'] == '1' and iter > 1:
-                model.load_state_dict(self.model_parameters[iter - 1])
+            model = eval('models.{}().to(cfg["device"])'.format(self.model_name[epoch]))
+            if 'dl' in cfg and ['dl'] == '1' and epoch > 1:
+                model.load_state_dict(self.model_parameters[epoch - 1])
             model.train(True)
-            optimizer = make_optimizer(model, self.model_name[iter])
-            scheduler = make_scheduler(optimizer, self.model_name[iter])
-            for local_epoch in range(1, cfg[self.model_name[iter]]['num_epochs'] + 1):
+            optimizer = make_optimizer(model, self.model_name[epoch])
+            scheduler = make_scheduler(optimizer, self.model_name[epoch])
+            for local_epoch in range(1, cfg[self.model_name[epoch]]['num_epochs'] + 1):
                 start_time = time.time()
                 for i, input in enumerate(data_loader):
                     input = collate(input)
@@ -96,16 +101,26 @@ class Organization:
                 scheduler.step()
                 local_time = (time.time() - start_time)
                 local_finished_time = datetime.timedelta(
-                    seconds=round((cfg[self.model_name[iter]]['num_epochs'] - local_epoch) * local_time))
+                    seconds=round((cfg[self.model_name[epoch]]['num_epochs'] - local_epoch) * local_time))
                 info = {'info': ['Model: {}'.format(cfg['model_tag']),
                                  'Train Local Epoch: {}({:.0f}%)'.format(local_epoch, 100. * local_epoch /
-                                                                         cfg[self.model_name[iter]]['num_epochs']),
+                                                                         cfg[self.model_name[epoch]]['num_epochs']),
                                  'ID: {}'.format(self.organization_id),
                                  'Local Finished Time: {}'.format(local_finished_time)]}
                 logger.append(info, 'train', mean=False)
                 print(logger.write('train', metric.metric_name['train']), end='\r', flush=True)
+                # if epoch == cfg['global']['num_epochs']:
+                #     print("write figure")
+                #     logger.writeFigure(model, input, input['target'], local_epoch, data_loader, i)
+                # fig = plot_classes_preds(model, input, input['target'])
+                # print_classes_preds(input, output, model)
+                # # plt.show()
+                # directory = f"output/figs/"
+                # if not os.path.exists(directory):
+                #     os.makedirs(directory)
+                # fig.savefig(f"{directory}/{epoch}_{local_epoch}.png")
             sys.stdout.write('\x1b[2K')
-            self.model_parameters[iter] = model.to('cpu').state_dict()
+            self.model_parameters[epoch] = model.to('cpu').state_dict()
         return
 
     def predict(self, iter, data_loader):

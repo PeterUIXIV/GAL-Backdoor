@@ -1,6 +1,7 @@
 import datetime
 import math
 import random
+from matplotlib import pyplot as plt
 import numpy as np
 import sys
 import time
@@ -8,7 +9,7 @@ import torch
 from marks import Watermark
 import models
 from config import cfg
-from utils import show_images, show_images_with_labels, to_device, make_optimizer, make_scheduler, collate
+from utils import plot_classes_preds, show_images, show_images_with_labels, to_device, make_optimizer, make_scheduler, collate
 
 classes = ('plane', 'car', 'bird', 'cat',
            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
@@ -70,15 +71,9 @@ class MalOrg:
         logger.append(evaluation, 'test', n=test_target.size(0))
         return initialization
 
-    def train(self, iteration, data_loader, metric, logger):
-        print("Training mal_org")
-        print(f"self.model_name[iter]: {self.model_name[iteration]}")
-        print("Data loader")
-        print(data_loader)        
-        print(type(data_loader))
-        
-        if self.model_name[iteration] in ['gb', 'svm']:
-            model = eval('models.{}().to(cfg["device"])'.format(self.model_name[iteration]))
+    def train(self, epoch: int, data_loader, metric, logger):        
+        if self.model_name[epoch] in ['gb', 'svm']:
+            model = eval('models.{}().to(cfg["device"])'.format(self.model_name[epoch]))
             data, target = data_loader.dataset.data, data_loader.dataset.target
             input = {'data': torch.tensor(data), 'target': torch.tensor(target), 'feature_split': self.feature_split}
             input_size = len(input['data'])
@@ -88,7 +83,7 @@ class MalOrg:
             info = {'info': ['Model: {}'.format(cfg['model_tag']), 'ID: {}'.format(self.organization_id)]}
             logger.append(info, 'train', mean=False)
             print(logger.write('train', metric.metric_name['train']), end='\r', flush=True)
-            self.model_parameters[iteration] = model
+            self.model_parameters[epoch] = model
         else:
             #TODO:add mark and label stuff
             print("Data_loader.dataset")
@@ -98,13 +93,13 @@ class MalOrg:
             print("data_loader.dataset.target shape")
             print(data_loader.dataset.target.shape)
             first_iter = True
-            model = eval('models.{}().to(cfg["device"])'.format(self.model_name[iteration]))
-            if 'dl' in cfg and ['dl'] == '1' and iteration > 1:
-                model.load_state_dict(self.model_parameters[iteration - 1])
+            model = eval('models.{}().to(cfg["device"])'.format(self.model_name[epoch]))
+            if 'dl' in cfg and ['dl'] == '1' and epoch > 1:
+                model.load_state_dict(self.model_parameters[epoch - 1])
             model.train(True)
-            optimizer = make_optimizer(model, self.model_name[iteration])
-            scheduler = make_scheduler(optimizer, self.model_name[iteration])
-            for local_epoch in range(1, cfg[self.model_name[iteration]]['num_epochs'] + 1):
+            optimizer = make_optimizer(model, self.model_name[epoch])
+            scheduler = make_scheduler(optimizer, self.model_name[epoch])
+            for local_epoch in range(1, cfg[self.model_name[epoch]]['num_epochs'] + 1):
                 start_time = time.time()
 
                 for i, input in enumerate(data_loader):
@@ -121,7 +116,7 @@ class MalOrg:
                         # print(f"lab2 type: {type(lab2)}, shape {lab2.shape}")
                         if first_iter:
                             np_images = img2.numpy()
-                            show_images_with_labels(np_images, lab2, 3, 3, classes)
+                            # show_images_with_labels(np_images, lab2, 3, 3, classes)
                     images, labels = input['data'], input['target']
                     images, labels = self.addWatermark(data=(images, labels))
                     input['data'], input['target'] = images, labels
@@ -131,7 +126,7 @@ class MalOrg:
                         # print(f"Same img? : {torch.equal(img2, images)}")
                         if first_iter:
                             np_images = images.numpy()
-                            show_images_with_labels(np_images, labels, 3, 3, classes)
+                            # show_images_with_labels(np_images, labels, 3, 3, classes)
                             first_iter=False
                     input_size = input['data'].size(0)
                     input['feature_split'] = self.feature_split
@@ -148,31 +143,42 @@ class MalOrg:
                     optimizer.step()
                     evaluation = metric.evaluate(metric.metric_name['train'], input, output)
                     logger.append(evaluation, 'train', n=input_size)
-                    if i % 50 == 49:
-                        print(f"Loss_mode: {input['loss_mode']}")
-                        for keys,values in output.items():
-                            if keys == 'loss':
-                                print(keys)
-                                print(values)
-                            else:
-                                print(keys)
-                                print(values.shape)
+                    # if i % 50 == 49:
+                    #     # print(f"Loss_mode: {input['loss_mode']}")
+                    #     for keys,values in output.items():
+                    #         if keys == 'loss':
+                    #             print(keys)
+                    #             print(values)
+                    #         else:
+                    #             print(keys)
+                    #             print(values.shape)
                             
-                        print("logger write new Figure")
+                        # print(f"input type: {type(input['data'])}, shape {input['data'].shape}")
+                        # print(f"label type: {type(input['target'])}, shape {input['target'].shape}")
                         # logger.writeFigure(model, input, input['target'], local_epoch, data_loader, i)
                 scheduler.step()
                 local_time = (time.time() - start_time)
                 local_finished_time = datetime.timedelta(
-                    seconds=round((cfg[self.model_name[iteration]]['num_epochs'] - local_epoch) * local_time))
+                    seconds=round((cfg[self.model_name[epoch]]['num_epochs'] - local_epoch) * local_time))
                 info = {'info': ['Model: {}'.format(cfg['model_tag']),
                                  'Train Local Epoch: {}({:.0f}%)'.format(local_epoch, 100. * local_epoch /
-                                                                         cfg[self.model_name[iteration]]['num_epochs']),
+                                                                         cfg[self.model_name[epoch]]['num_epochs']),
                                  'ID: {}'.format(self.organization_id),
                                  'Local Finished Time: {}'.format(local_finished_time)]}
                 logger.append(info, 'train', mean=False)
+                # if epoch == cfg['global']['num_epochs']:
+                #     print("write figure")
+                #     logger.writeFigure(model, input, input['target'], local_epoch, data_loader, i)
+                # fig = plot_classes_preds(model, input, input['target'])
+                # print_classes_preds(input, output, model)
+                # # plt.show()
+                # directory = f"output/figs/"
+                # if not os.path.exists(directory):
+                #     os.makedirs(directory)
+                # fig.savefig(f"{directory}/{epoch}_{local_epoch}.png")
                 print(logger.write('train', metric.metric_name['train']), end='\r', flush=True)
             sys.stdout.write('\x1b[2K')
-            self.model_parameters[iteration] = model.to('cpu').state_dict()
+            self.model_parameters[epoch] = model.to('cpu').state_dict()
         return
 
     def predict(self, iteration, data_loader):

@@ -4,14 +4,21 @@ from matplotlib import pyplot as plt
 import numpy as np
 import os
 import pickle
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 import torch
 import torch.optim as optim
+import torch.nn.functional as F
 import numbers
 from itertools import repeat
 from torchvision.utils import save_image
 from config import cfg
 from torch.nn.utils.rnn import pad_sequence
 
+from models.conv import Conv
+
+
+classes = ('plane', 'car', 'bird', 'cat',
+           'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
 def check_exists(path):
     return os.path.exists(path)
@@ -370,3 +377,155 @@ def show_images_with_labels(images, labels, nrows, ncols, classes):
         label = classes[label_idx]
         ax.set_title(f"Label: {label}")
     plt.show()
+    
+# def images_to_probs(net, images):
+#     '''
+#     Generates predictions and corresponding probabilities from a trained
+#     network and a list of images
+#     '''
+#     output = net(images)
+#     output = output['target']
+#     # convert output probabilities to predicted class
+#     _, preds_tensor = torch.max(output, 1)
+#     preds = np.squeeze(preds_tensor.cpu().numpy())
+#     return preds, [F.softmax(el, dim=0)[i].item() for i, el in zip(preds, output)]
+def images_to_probs(net, images):
+    '''
+    Generates predictions and corresponding probabilities from a trained
+    network and a list of images
+    '''
+    net.eval()  # Ensure the network is in evaluation mode
+    with torch.no_grad():  # No need to compute gradients during inference
+        output = net(images)
+        logits = output['target']
+        probabilities = F.softmax(logits, dim=1)
+        max_prob, pred = torch.max(probabilities, 1)
+        pred = pred.cpu().numpy()
+        max_prob = max_prob.cpu().numpy()
+    return pred, max_prob
+
+def matplotlib_imshow(img: torch.Tensor, normalize=False):
+    if normalize:
+        img = img / 2 + 0.5     # unnormalize
+    npimg = img.cpu().numpy()
+    
+    # Check if the image is grayscale or color
+    if npimg.shape[0] == 1:  # Grayscale image
+        npimg = npimg.squeeze()  # Remove the channel dimension
+        plt.imshow(npimg, cmap='gray')
+    else:
+        plt.imshow(np.transpose(npimg, (1, 2, 0)))
+
+# def plot_classes_preds(net, images, labels):
+#     '''
+#     Generates matplotlib Figure using a trained network, along with images
+#     and labels from a batch, that shows the network's top prediction along
+#     with its probability, alongside the actual label, coloring this
+#     information based on whether the prediction was correct or not.
+#     Uses the "images_to_probs" function.
+#     '''
+#     preds, probs = images_to_probs(net, images)
+#     # plot the images in the batch, along with predicted and true labels
+#     fig = plt.figure(figsize=(12, 48))
+#     for idx in np.arange(4):
+#         ax = fig.add_subplot(1, 4, idx+1, xticks=[], yticks=[])
+#         matplotlib_imshow(images['data'][idx], normalize=False)
+#         label_idx = torch.argmax(labels[idx])
+#         ax.set_title("{0}, {1:.1f}%\n(label: {2})".format(
+#             classes[preds[idx]],
+#             probs[idx] * 100.0,
+#             classes[label_idx]),
+#                 color=("green" if preds[idx]==label_idx.item() else "red"))
+#             # classes[labels[idx]]),
+#                     # color=("green" if preds[idx]==labels[idx].item() else "red"))
+#     return fig
+def plot_classes_preds(net: Conv, images, labels):
+    '''
+    Generates matplotlib Figure using a trained network, along with images
+    and labels from a batch, that shows the network's top prediction along
+    with its probability, alongside the actual label, coloring this
+    information based on whether the prediction was correct or not.
+    Uses the "images_to_probs" function.
+    '''
+        
+    preds, probs = images_to_probs(net, images)
+    # print(f"preds type {type(preds)}, preds len {preds.shape}")
+    # print(f"probs type {type(probs)}, probs len {probs.shape}")
+    
+    # plot the images in the batch, along with predicted and true labels
+    images = images['data']
+    # print(f"images type {type(images)}, shape {images.shape}")
+    true_classes = torch.argmax(labels, dim=1)
+    # print(f"true_classes type {type(true_classes)}, shape {true_classes.shape}")
+
+    fig = plt.figure(figsize=(12, 48))
+    for idx in range(4):
+        ax = fig.add_subplot(1, 4, idx+1, xticks=[], yticks=[])
+        matplotlib_imshow(images[idx], normalize=False)
+        pred_class_idx = preds[idx]
+        true_class_idx = true_classes[idx].item()
+        pred_class_name = classes[pred_class_idx]
+        true_class_name = classes[true_class_idx]
+        # print(f"pred_class_name: {pred_class_name}, type: {type(pred_class_name)}")
+        # print(f"true_class_name: {true_class_name}, type: {type(true_class_name)}")
+
+        pred_prob = probs[idx] * 100.0
+        # print(f"pred_prob: {pred_prob}, type: {type(pred_prob)}")
+        ax.set_title("{0}, {1:.1f}%\n(label: {2})".format(
+            pred_class_name,
+            pred_prob,
+            true_class_name),
+            color=("green" if pred_class_idx == true_class_idx else "red"))
+    return fig
+
+def print_classes_preds(input: torch.Tensor, output: torch.Tensor):
+    
+    # print(f"output: {output}, type: {type(output)}")
+    # print(f"images type {type(images)}, shape {images.shape}")
+    # true_classes = torch.argmax(images, dim=1)
+    probabilities = F.softmax(output, dim=1)
+    max_prob, pred = torch.max(probabilities, 1)
+    pred = pred.cpu().numpy()
+    max_prob = max_prob.cpu().numpy()
+    for i in range(4):
+        pred_class_name = classes[pred[i]]
+        true_class_name = classes[input[i].item()]
+        print(f"output {i}: {output[i]}")
+        print(f"probabilities {i}: {probabilities[i]}")
+        print(f"label {i}: {input[i].item()}, type: {type(input[i].item())} class_name {true_class_name}")
+        print(f"pred {i}: {pred[i]}, type: {type(pred[i])} class_name {pred_class_name}")
+        print(f"max_prob {i}: {max_prob[i]}, type: {type(max_prob[i])}")
+        
+        
+        # true_class_idx = true_classes[i].item()
+        # true_class_name = classes[true_class_idx]
+        
+def evaluate_predictions(true_labels, predicted_probs, threshold=0.5):
+    """
+    Evaluate predictions using accuracy, precision, recall, and F1-score.
+    
+    Args:
+    true_labels (torch.Tensor): True labels tensor of shape (batch_size).
+    predicted_probs (torch.Tensor): Predicted probabilities tensor of shape (batch_size, num_classes).
+    threshold (float): Threshold for converting probabilities to binary predictions (default is 0.5).
+    
+    Returns:
+    dict: Dictionary containing accuracy, precision, recall, and F1-score.
+    """
+    # Convert predicted probabilities to binary predictions
+    predicted_labels = torch.argmax(predicted_probs, dim=1)
+    
+    # Calculate metrics
+    accuracy = accuracy_score(true_labels.numpy(), predicted_labels.numpy())
+    precision = precision_score(true_labels.numpy(), predicted_labels.numpy(), average='macro')
+    recall = recall_score(true_labels.numpy(), predicted_labels.numpy(), average='macro')
+    f1 = f1_score(true_labels.numpy(), predicted_labels.numpy(), average='macro')
+    
+    metrics = {
+        'Accuracy': accuracy,
+        'Precision': precision,
+        'Recall': recall,
+        'F1-score': f1
+    }
+    
+    return metrics
