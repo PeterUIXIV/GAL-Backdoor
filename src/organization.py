@@ -20,14 +20,13 @@ class Organization:
     def initialize(self, dataset, metric, logger):
         input, output, initialization = {}, {}, {}
         print("Begnin Org init")
-        print(cfg['data_name'])
+        print(f"Data name {cfg['data_name']}")
         if cfg['data_name'] in ['MIMICL', 'MIMICM']:
             train_target = torch.tensor(np.concatenate(dataset['train'].target, axis=0))
             test_target = torch.tensor(np.concatenate(dataset['test'].target, axis=0))
         else:
             train_target = torch.tensor(dataset['train'].target)
             test_target = torch.tensor(dataset['test'].target)
-        print(train_target.dtype)
         if train_target.dtype == torch.int64:
             if cfg['data_name'] in ['MIMICM']:
                 _, _, counts = torch.unique(train_target[train_target != -65535], sorted=True, return_inverse=True,

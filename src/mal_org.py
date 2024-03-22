@@ -85,7 +85,8 @@ class MalOrg:
             print(logger.write('train', metric.metric_name['train']), end='\r', flush=True)
             self.model_parameters[epoch] = model
         else:
-            #TODO:add mark and label stuff
+            print("Data_loader")
+            print(data_loader)
             print("Data_loader.dataset")
             print(data_loader.dataset)
             print("Data_loader.dataset.data shape")
@@ -116,7 +117,7 @@ class MalOrg:
                         # print(f"lab2 type: {type(lab2)}, shape {lab2.shape}")
                         if first_iter:
                             np_images = img2.numpy()
-                            # show_images_with_labels(np_images, lab2, 3, 3, classes)
+                            # show_images_with_labels(np_images, lab2, 3, 3)
                     images, labels = input['data'], input['target']
                     images, labels = self.addWatermark(data=(images, labels))
                     input['data'], input['target'] = images, labels
@@ -126,7 +127,7 @@ class MalOrg:
                         # print(f"Same img? : {torch.equal(img2, images)}")
                         if first_iter:
                             np_images = images.numpy()
-                            # show_images_with_labels(np_images, labels, 3, 3, classes)
+                            # show_images_with_labels(np_images, labels, 3, 3)
                             first_iter=False
                     input_size = input['data'].size(0)
                     input['feature_split'] = self.feature_split
@@ -261,6 +262,8 @@ class MalOrg:
             (torch.Tensor, torch.Tensor): Result tuple of input and label tensors.
         """
         _input, _label = data
+        # _input size torch.Size([512, 3, 32, 32]) _input len 512
+        # _label size torch.Size([512, 10]) _label len 512
         if not org:
             if keep_org:
                 decimal, integer = math.modf(len(_label) * self.poison_ratio)

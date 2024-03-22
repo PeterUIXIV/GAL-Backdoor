@@ -41,8 +41,9 @@ def main():
     for i in range(cfg['num_experiments']):
         current_time = datetime.datetime.now()
         formatted_time = current_time.strftime("%b%d_%H-%M-%S")
-        print(formatted_time)
-        model_tag_list = [str(seeds[i]), cfg['data_name'], cfg['model_name'], cfg['control_name'], formatted_time]
+        # model_tag_list = [str(seeds[i]), cfg['data_name'], cfg['model_name'], cfg['control_name'], formatted_time]
+        model_tag_list = [str(seeds[i]), cfg['data_name'], cfg['model_name'], cfg['control_name']]
+        
         cfg['model_tag'] = '_'.join([x for x in model_tag_list if x])
         print('Experiment: {}'.format(cfg['model_tag']))
         runExperiment()
@@ -56,15 +57,9 @@ def runExperiment():
     dataset = fetch_dataset(cfg['data_name'])
     process_dataset(dataset)
     
-    # mark = trojanvision.marks.create(dataset=dataset, mark_path=cfg['mark_path'])
-    # feature_split = split_dataset(cfg['num_users'] + cfg['num_attackers'])
     feature_split = split_dataset(cfg['num_users'])
-    
-    print(f"target_size: {cfg['target_size']}")
-    print(f"data_size: {cfg['data_size']}")
-    print(f"data_shape {dataset['train'].data.shape}")
     assist = Assi(feature_split)
-    # assist = Assist(feature_split[:cfg['num_users']])
+    # assist = Assist(feature_split)
     
     poison_percent = cfg['poison_percent']
     # Data_shape is only used to create the mark
@@ -189,7 +184,7 @@ def test(assist, metric, logger, epoch):
         print("Output:")
         for key in output:
             print(f"key: {key}, value shape: {output[key].shape}")
-        print_classes_preds(input=input['target'], output=output['target'])
+        print_classes_preds(labels=input['target'], output=output['target'])
         
         evaluation_result = evaluate_predictions(input['target'], output['target'])
         print("Evaluation Metrics:")

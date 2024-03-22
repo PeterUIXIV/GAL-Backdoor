@@ -249,6 +249,8 @@ def process_control():
     cfg['attack_mode'] = cfg['backdoor']['attack']
     cfg['num_attackers'] = int(cfg['backdoor']['num_attackers'])
     cfg['poison_percent'] = float(cfg['backdoor']['poison_percent'])
+    cfg['poison_ratio'] = cfg['poison_percent'] / (1 - cfg['poison_percent'])
+    cfg['target_class'] = int(cfg['backdoor']['target_class'])
     cfg['mark_path'] = cfg['mark']['mark_path']
     return
 
@@ -367,14 +369,22 @@ def show_images(images, nrows, ncols):
         ax.axis('off')
     plt.show()
     
-def show_images_with_labels(images, labels, nrows, ncols, classes):
+def show_images_with_labels(images, labels, nrows, ncols):
+    print("show images")
+    print(f"images type {type(images)}")
     fig, axes = plt.subplots(nrows, ncols, figsize=(10, 10))
     for i, ax in enumerate(axes.flat):
-        ax.imshow(np.transpose(images[i], (1, 2, 0)))
+        image = images[i]
+        if image.shape != (32, 32, 3):
+            image = np.transpose(image, (1, 2, 0))
+        ax.imshow(image)
         ax.axis('off')
         # Convert one-hot encoded label to original label
-        label_idx = torch.argmax(labels[i])
-        label = classes[label_idx]
+        if labels.dim() > 1:
+            label_idx = torch.argmax(labels[i])
+            label = classes[label_idx]
+        else:
+            label = classes[labels[i].item()]
         ax.set_title(f"Label: {label}")
     plt.show()
     
@@ -414,7 +424,9 @@ def matplotlib_imshow(img: torch.Tensor, normalize=False):
         npimg = npimg.squeeze()  # Remove the channel dimension
         plt.imshow(npimg, cmap='gray')
     else:
-        plt.imshow(np.transpose(npimg, (1, 2, 0)))
+        if npimg.shape != (32, 32, 3):
+            npimg = np.transpose(npimg, (1, 2, 0))
+        plt.imshow(npimg)
 
 # def plot_classes_preds(net, images, labels):
 #     '''
@@ -478,21 +490,48 @@ def plot_classes_preds(net: Conv, images, labels):
             color=("green" if pred_class_idx == true_class_idx else "red"))
     return fig
 
-def print_classes_preds(input: torch.Tensor, output: torch.Tensor):
+def output_to_preds(output: torch.Tensor):
+    probabilities = F.softmax(output, dim=1)
+    max_prob, pred = torch.max(probabilities, 1)
+    pred = pred.cpu().numpy()
+    max_prob = max_prob.cpu().numpy()
+    return pred, max_prob
+
+def plot_output_preds(images: torch.Tensor, labels: torch.Tensor, output: torch.Tensor, nrows: int, ncols: int):
+    preds, probs = output_to_preds(output)
+        
+    fig, axes = plt.subplots(nrows, ncols, figsize=(10, 10))
+    for i, ax in enumerate(axes.flat):
+        matplotlib_imshow(images[i], normalize=False)
+        true_class_name = classes[labels[i].item()]
+        pred_class_name = classes[preds[i]]
+        pred_prob = probs[i] * 100.0
+        
+        ax.set_title("{0}, {1:.1f}%\n(label: {2})".format(
+            pred_class_name,
+            pred_prob,
+            true_class_name),
+            color=("green" if pred_class_name == true_class_name else "red"))
+    return fig
+
+def print_classes_preds(labels: torch.Tensor, output: torch.Tensor):
+    r"""Print class predictions.
     
-    # print(f"output: {output}, type: {type(output)}")
-    # print(f"images type {type(images)}, shape {images.shape}")
-    # true_classes = torch.argmax(images, dim=1)
+    Args:
+        labels (torch.Tensor): Label tensor representing classes.
+        output (torch.Tensor): Output tensor representing class probabilities.
+
+    """
     probabilities = F.softmax(output, dim=1)
     max_prob, pred = torch.max(probabilities, 1)
     pred = pred.cpu().numpy()
     max_prob = max_prob.cpu().numpy()
     for i in range(4):
         pred_class_name = classes[pred[i]]
-        true_class_name = classes[input[i].item()]
+        true_class_name = classes[labels[i].item()]
         print(f"output {i}: {output[i]}")
         print(f"probabilities {i}: {probabilities[i]}")
-        print(f"label {i}: {input[i].item()}, type: {type(input[i].item())} class_name {true_class_name}")
+        print(f"label {i}: {labels[i].item()}, type: {type(labels[i].item())} class_name {true_class_name}")
         print(f"pred {i}: {pred[i]}, type: {type(pred[i])} class_name {pred_class_name}")
         print(f"max_prob {i}: {max_prob[i]}, type: {type(max_prob[i])}")
         
@@ -529,3 +568,17 @@ def evaluate_predictions(true_labels, predicted_probs, threshold=0.5):
     }
     
     return metrics
+
+def show_image_with_label(image_tensor, label_tensor):
+    # Convert image tensor from (3, 32, 32) to (32, 32, 3)
+    image = np.transpose(image_tensor, (1, 2, 0))
+    
+    # Plot the image
+    plt.imshow(image)
+    
+    # Set title with the label
+    plt.title(f'Label: {classes[label_tensor.item()]}')
+    
+    # Show plot
+    plt.axis('off')
+    plt.show()
