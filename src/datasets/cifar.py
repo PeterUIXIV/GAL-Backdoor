@@ -30,8 +30,10 @@ class CIFAR10(Dataset):
         data, target = Image.fromarray(self.data[index]), torch.tensor(self.target[index])
         other = {k: torch.tensor(self.other[k][index]) for k in self.other}
         input = {**other, 'data': data, 'target': target}
+        
         if self.transform is not None:
             input = self.transform(input)
+        
         return input
 
     def __len__(self):
@@ -82,6 +84,12 @@ class CIFAR10(Dataset):
             make_tree(classes_to_labels, [c])
         target_size = make_flat_index(classes_to_labels)
         return (train_id, train_data, train_target), (test_id, test_data, test_target), (classes_to_labels, target_size)
+    
+    def replace_image(self, index, new_image):
+        self.data[index] = np.array(new_image)
+        
+    def replace_target(self, index, new_target):
+        self.target[index] = new_target
 
 
 class CIFAR100(CIFAR10):

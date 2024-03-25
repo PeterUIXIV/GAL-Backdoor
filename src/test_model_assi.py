@@ -9,6 +9,8 @@ from matplotlib import pyplot as plt
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
+import torchvision.transforms as T
+import datasets
 from datasets.cifar import CIFAR10
 from marks import Watermark
 import models
@@ -18,6 +20,7 @@ from metrics import Metric
 from assist import Assist
 from utils import collate, plot_output_preds, save, load, process_control, process_dataset, resume, show_image_with_label, show_images_with_labels
 from logger import make_logger
+from torchvision import transforms
 
 cudnn.benchmark = True
 parser = argparse.ArgumentParser(description='cfg')
@@ -60,27 +63,23 @@ def runExperiment():
     test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
     initialize(dataset, assist, organization[0], metric, test_logger, 0)
     
+    ## Watermark
     inputs_test = torch.stack([sample['data'] for sample in dataset['test']], dim=0)
     labels_test = torch.tensor([sample['target'] for sample in dataset['test']])
-
-    print(f"inputs_test type {type(inputs_test)}, shape {inputs_test.shape}")
-    print(f"labels_test type {type(labels_test)}, shape {labels_test.shape}")        
-    dataset_copy = copy.deepcopy(dataset)
-
-    data_shape = dataset_copy['test'].data.shape
+    
+    data_shape = dataset['test'].data.shape
     mark = Watermark(data_shape=data_shape)
     
     np_images = inputs_test.numpy()
-    # show_images_with_labels(np_images, labels_test, 3, 3)
+    show_images_with_labels(np_images, labels_test, 3, 3)
     # images, labels = add_watermark(mark=mark, data=(inputs_test, labels_test))
-    dataset_with_watermark = add_watermark_to_dataset(mark=mark, dataset=dataset_copy)
+    dataset_with_watermark = add_watermark_to_dataset(mark=mark, dataset=dataset)
     
     altered_images = torch.stack([sample['data'] for sample in dataset_with_watermark['test']], dim=0)
     altered_labels = torch.tensor([sample['target'] for sample in dataset_with_watermark['test']])
     np_images = altered_images.numpy()
     show_images_with_labels(np_images, altered_labels, 3, 3)
     # plot_output_preds(np_images, labels_test, output, 3, 3)
-    # plt.show()
 
 
     for epoch in range(1, last_epoch):
@@ -146,73 +145,68 @@ def test(assist, metric, logger, epoch):
         print(logger.write('test', metric.metric_name['test']))
     return
 
-# def add_watermark_to_dataset(mark, dataset):
-#     dataset_copy = copy.deepcopy(dataset)
-    
-#     for i, sample in enumerate(dataset_copy['test']):
-#         print(f"image type {type(sample['data'])} shape {sample['data'].shape}")
-#         print(f"label type {type(sample['target'])} shape {sample['target'].shape}")        
-#         altered_data, altered_target = add_watermark(mark, (sample['data'], sample['target']))
-#         print(f"image type {type(altered_data)} shape {altered_data.shape}")
-#         print(f"label type {type(altered_target)} shape {altered_target.shape}")        
-#         show_image_with_label(altered_data, altered_target)
-#         # altered_data = sample['data'] + 1
-#         # altered_target = sample['target'] + 1
-#         dataset_copy['test'][i]['data'] = altered_data
-#         dataset_copy['test'][i]['target'] = altered_target
-#         print("Equal data", torch.all(torch.eq(altered_data, dataset_copy['test'][i]['data'])))
-#         print("Equal target", torch.all(torch.eq(altered_target, dataset_copy['test'][i]['target'])))
-#         show_image_with_label(dataset_copy['test'][i]['data'], dataset_copy['test'][i]['target'])
-#     return dataset_copy
-
-def add_watermark_to_dataset(mark, dataset):
-    print("dataset")
-    print(dataset)
-    print(f"dataset type {type(dataset)}")
-    print(f"test type {type(dataset['test'])}, train type {type(dataset['train'])}")
-    print("test dataset")
-    print(dataset['test'])
-    data_len = len(dataset['test'])  # Assuming all samples have the same batch size
-    model_name = cfg['model_name']
-    batch_size = cfg[model_name]['batch_size']['test']
-    num_batches = (data_len + batch_size - 1) // batch_size
-    data_loader = make_data_loader(dataset, model_name)
-    test_loader = data_loader['test']
-    modified_datset = {}
-    modified_datset['train'] = dataset['train']
-    modified_datset['test'] = CIFAR10(root='./data/{}'.format('CIFAR10'), split='test')
-    print(f"test type {type(modified_datset['test'])}, train type {type(modified_datset['train'])}")
-    
-    
-    for i, data in enumerate(test_loader):
-        data = collate(data)
-        print(f"data shape {data['data'].shape}, target shape {data['target'].shape}")
-        # np_images = data['data'].numpy()
-        # show_images_with_labels(data['data'], data['target'], 3, 3)
-        _input, _label = add_watermark(mark=mark, data=(data['data'], data['target']))
-        show_images_with_labels(_input, _label, 3, 3)
-        modified_datset['test'][i]['data'] = _input
-        modified_datset['test'][i]['target'] = _label
-        show_images_with_labels(modified_datset['test'][i]['data'], modified_datset['test'][i]['target'], 3, 3)
-        # data = [(input_data, label) for input_data, label in zip(_input, _label)]
-        
-    # for i in range(num_batches):
-    #     start_idx = i * batch_size
-    #     end_idx = min((i + 1) * batch_size, data_len)
-
-    #     batch_data = [sample['data'] for sample in dataset['test'][start_idx:end_idx]]
-    #     batch_labels = [sample['target'] for sample in dataset['test'][start_idx:end_idx]]
-
-    #     watermarked_batch_data, watermarked_batch_labels = add_watermark(mark=mark, data=(batch_data, batch_labels))
-
-    #     for j, idx in enumerate(range(start_idx, end_idx)):
-    #         dataset['test'][idx]['data'] = watermarked_batch_data[j]
-    #         dataset['test'][idx]['target'] = watermarked_batch_labels[j]
-    # print("data")
-    # print(type(data))
-    # print(len((data)))
-
+def add_watermark_to_dataset(mark, dataset):    
+    for i, sample in enumerate(dataset['test']):  
+        altered_data, altered_target = add_watermark(mark, (sample['data'], sample['target']))
+        numpy_img = (altered_data.numpy() * 255).astype(np.uint8)  
+        numpy_lbl = altered_target.numpy()
+        # show_image_with_label(scaled_img , altered_target)
+        numpy_img = np.transpose(numpy_img , (1, 2, 0))
+        dataset['test'].replace_image(i, numpy_img)
+        dataset['test'].replace_target(i, numpy_lbl)
+        # show_image_with_label(dataset_copy['test'][i]['data'], dataset_copy['test'][i]['target'])
     return dataset
+
+# def add_watermark_to_dataset(mark, dataset):
+#     print("dataset")
+#     print(dataset)
+#     print(f"dataset type {type(dataset)}")
+#     print(f"test type {type(dataset['test'])}, train type {type(dataset['train'])}")
+#     print("test dataset")
+#     print(dataset['test'])
+#     data_len = len(dataset['test'])  # Assuming all samples have the same batch size
+#     model_name = cfg['model_name']
+#     batch_size = cfg[model_name]['batch_size']['test']
+#     num_batches = (data_len + batch_size - 1) // batch_size
+#     data_loader = make_data_loader(dataset, model_name)
+#     test_loader = data_loader['test']
+#     modified_datset = {}
+#     modified_datset['train'] = dataset['train']
+#     transform = datasets.Compose([transforms.ToTensor()])
+#     modified_datset['test'] = CIFAR10(root='./data/{}'.format('CIFAR10'), split='test', transform=transform)
+#     print(f"test type {type(modified_datset['test'])}, train type {type(modified_datset['train'])}")
+    
+    
+#     for i, data in enumerate(test_loader):
+#         data = collate(data)
+#         print(f"data shape {data['data'].shape}, target shape {data['target'].shape}")
+#         # np_images = data['data'].numpy()
+#         # show_images_with_labels(data['data'], data['target'], 3, 3)
+#         print(f"data type {type(data['data'])} target type {type(data['target'])}")
+#         _input, _label = add_watermark(mark=mark, data=(data['data'], data['target']))
+#         show_images_with_labels(_input, _label, 3, 3)
+#         modified_datset['test'][i]['data'] = _input
+#         modified_datset['test'][i]['target'] = _label
+#         show_images_with_labels(modified_datset['test'][i]['data'], modified_datset['test'][i]['target'], 3, 3)
+#         # data = [(input_data, label) for input_data, label in zip(_input, _label)]
+        
+#     # for i in range(num_batches):
+#     #     start_idx = i * batch_size
+#     #     end_idx = min((i + 1) * batch_size, data_len)
+
+#     #     batch_data = [sample['data'] for sample in dataset['test'][start_idx:end_idx]]
+#     #     batch_labels = [sample['target'] for sample in dataset['test'][start_idx:end_idx]]
+
+#     #     watermarked_batch_data, watermarked_batch_labels = add_watermark(mark=mark, data=(batch_data, batch_labels))
+
+#     #     for j, idx in enumerate(range(start_idx, end_idx)):
+#     #         dataset['test'][idx]['data'] = watermarked_batch_data[j]
+#     #         dataset['test'][idx]['target'] = watermarked_batch_labels[j]
+#     # print("data")
+#     # print(type(data))
+#     # print(len((data)))
+
+#     return dataset
 
 def add_watermark(mark: Watermark, data: tuple[torch.Tensor, torch.Tensor],
                  org: bool = False, keep_org: bool = True,

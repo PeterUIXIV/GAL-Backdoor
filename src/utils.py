@@ -370,8 +370,6 @@ def show_images(images, nrows, ncols):
     plt.show()
     
 def show_images_with_labels(images, labels, nrows, ncols):
-    print("show images")
-    print(f"images type {type(images)}")
     fig, axes = plt.subplots(nrows, ncols, figsize=(10, 10))
     for i, ax in enumerate(axes.flat):
         image = images[i]
