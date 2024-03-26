@@ -25,11 +25,16 @@ class CIFAR10(Dataset):
         self.classes_counts = make_classes_counts(self.target)
         self.classes_to_labels, self.target_size = load(os.path.join(self.processed_folder, 'meta.pt'), mode='pickle')
         self.other = {'id': id}
+        self.org_target = [None] * self.__len__()
 
     def __getitem__(self, index):
         data, target = Image.fromarray(self.data[index]), torch.tensor(self.target[index])
         other = {k: torch.tensor(self.other[k][index]) for k in self.other}
         input = {**other, 'data': data, 'target': target}
+        
+        if self.org_target is not None and self.org_target[index] is not None:
+            input['org_target'] = self.org_target[index].clone().detach()
+
         
         if self.transform is not None:
             input = self.transform(input)
@@ -90,6 +95,23 @@ class CIFAR10(Dataset):
         
     def replace_target(self, index, new_target):
         self.target[index] = new_target
+        
+    def replace_org_target(self, index, org_target): 
+        self.org_target[index] = org_target
+        
+
+def read_pickle_file(path, filenames):
+    img, label = [], []
+    for filename in filenames:
+        file_path = os.path.join(path, filename)
+        with open(file_path, 'rb') as f:
+            entry = pickle.load(f, encoding='latin1')
+            img.append(entry['data'])
+            label.extend(entry['labels']) if 'labels' in entry else label.extend(entry['fine_labels'])
+    img = np.vstack(img).reshape(-1, 3, 32, 32)
+    img = img.transpose((0, 2, 3, 1))
+    label = np.array(label).astype(np.int64)
+    return img, label
 
 
 class CIFAR100(CIFAR10):
@@ -114,21 +136,6 @@ class CIFAR100(CIFAR10):
             make_tree(classes_to_labels, c)
         target_size = make_flat_index(classes_to_labels, classes)
         return (train_id, train_data, train_target), (test_id, test_data, test_target), (classes_to_labels, target_size)
-
-
-def read_pickle_file(path, filenames):
-    img, label = [], []
-    for filename in filenames:
-        file_path = os.path.join(path, filename)
-        with open(file_path, 'rb') as f:
-            entry = pickle.load(f, encoding='latin1')
-            img.append(entry['data'])
-            label.extend(entry['labels']) if 'labels' in entry else label.extend(entry['fine_labels'])
-    img = np.vstack(img).reshape(-1, 3, 32, 32)
-    img = img.transpose((0, 2, 3, 1))
-    label = np.array(label).astype(np.int64)
-    return img, label
-
 
 CIFAR100_classes = {
     'aquatic mammals': ['beaver', 'dolphin', 'otter', 'seal', 'whale'],

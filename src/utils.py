@@ -246,12 +246,14 @@ def process_control():
     cfg['global'] = {}
     cfg['global']['num_epochs'] = cfg['global_epoch']
     cfg['stats'] = make_stats()
+    ## Backdoor
     cfg['attack_mode'] = cfg['backdoor']['attack']
     cfg['num_attackers'] = int(cfg['backdoor']['num_attackers'])
     cfg['poison_percent'] = float(cfg['backdoor']['poison_percent'])
     cfg['poison_ratio'] = cfg['poison_percent'] / (1 - cfg['poison_percent'])
     cfg['target_class'] = int(cfg['backdoor']['target_class'])
     cfg['mark_path'] = cfg['mark']['mark_path']
+    cfg['backdoor_test'] = False
     return
 
 
@@ -577,6 +579,20 @@ def show_image_with_label(image_tensor, label_tensor):
     # Set title with the label
     plt.title(f'Label: {classes[label_tensor.item()]}')
     
+    # Show plot
+    plt.axis('off')
+    plt.show()
+    
+def show_image_with_two_labels(image_tensor, true_label, target_label):
+    # Convert image tensor from (3, 32, 32) to (32, 32, 3)
+    image = np.transpose(image_tensor, (1, 2, 0))
+    
+    # Plot the image
+    plt.imshow(image)
+    
+    # Set title with the label
+    plt.title("True Label: {}\nTarget Label: {}".format(classes[true_label.item()], classes[target_label.item()]))
+
     # Show plot
     plt.axis('off')
     plt.show()

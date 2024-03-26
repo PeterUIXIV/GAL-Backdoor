@@ -18,7 +18,7 @@ from config import cfg
 from data import fetch_dataset, make_data_loader, split_dataset
 from metrics import Metric
 from assist import Assist
-from utils import collate, plot_output_preds, save, load, process_control, process_dataset, resume, show_image_with_label, show_images_with_labels
+from utils import collate, plot_output_preds, save, load, process_control, process_dataset, resume, show_image_with_two_labels, show_images_with_labels
 from logger import make_logger
 from torchvision import transforms
 
@@ -39,6 +39,7 @@ cfg['control_name'] = '_'.join(
 
 def main():
     process_control()
+    cfg['backdoor_test'] = True
     seeds = list(range(cfg['init_seed'], cfg['init_seed'] + cfg['num_experiments']))
     for i in range(cfg['num_experiments']):
         model_tag_list = [str(seeds[i]), cfg['data_name'], cfg['model_name'], cfg['control_name']]
@@ -61,8 +62,6 @@ def runExperiment():
     assist.reset()
     metric = Metric({'test': ['Loss']})
     test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
-    initialize(dataset, assist, organization[0], metric, test_logger, 0)
-    
     ## Watermark
     inputs_test = torch.stack([sample['data'] for sample in dataset['test']], dim=0)
     labels_test = torch.tensor([sample['target'] for sample in dataset['test']])
@@ -71,26 +70,36 @@ def runExperiment():
     mark = Watermark(data_shape=data_shape)
     
     np_images = inputs_test.numpy()
-    show_images_with_labels(np_images, labels_test, 3, 3)
+    # show_images_with_labels(np_images, labels_test, 3, 3)
     # images, labels = add_watermark(mark=mark, data=(inputs_test, labels_test))
-    dataset_with_watermark = add_watermark_to_dataset(mark=mark, dataset=dataset)
+    dataset_with_watermark = add_watermark_to_test_dataset(mark=mark, dataset=dataset)    
     
     altered_images = torch.stack([sample['data'] for sample in dataset_with_watermark['test']], dim=0)
     altered_labels = torch.tensor([sample['target'] for sample in dataset_with_watermark['test']])
     np_images = altered_images.numpy()
-    show_images_with_labels(np_images, altered_labels, 3, 3)
+    # show_images_with_labels(np_images, altered_labels, 3, 3)
+    
     # plot_output_preds(np_images, labels_test, output, 3, 3)
-
+    
+    initialize(dataset_with_watermark, assist, organization[0], metric, test_logger, 0)
 
     for epoch in range(1, last_epoch):
-        #TODO: add watermark and test
         test_logger.safe(True)
-        data_loader = assist.broadcast(dataset, epoch)
+        data_loader = assist.broadcast(dataset_with_watermark, epoch)
+        print(f"data_loader type {type(data_loader)}")
+        for data in data_loader:
+            print(f"data shape {data['test'].dataset.data.shape}")
         organization_outputs = gather(data_loader, organization, epoch)
+        print(f"organization_outputs type {type(organization_outputs)}")
+        for i, output in enumerate(organization_outputs):
+            print(f"output {i} type {type(output)}")
+            print(f"output {i} test shape {output['test'].shape}")
         assist.update(organization_outputs, epoch)
         test(assist, metric, test_logger, epoch)
         test_logger.safe(False)
         test_logger.reset()
+        if epoch == last_epoch:
+            print("j")
     test_logger.safe(False)
     assist.reset()
     result = resume(cfg['model_tag'], load_tag='checkpoint')
@@ -113,6 +122,8 @@ def initialize(dataset, assist, organization, metric, logger, epoch):
             assist.organization_target[0][split] = torch.tensor(np.concatenate(dataset[split].target, axis=0))
         else:
             assist.organization_target[0][split] = torch.tensor(dataset[split].target)
+    ## adding original targets
+    assist.organization_org_target[0]['test'] = torch.tensor(dataset['test'].org_target)
     logger.safe(False)
     logger.reset()
     return
@@ -132,7 +143,13 @@ def test(assist, metric, logger, epoch):
     with torch.no_grad():
         input_size = assist.organization_target[0]['test'].size(0)
         input = {'target': assist.organization_target[0]['test']}
+        input['org_target'] = assist.organization_org_target[0]['test']
+        print(f"input type {type(input)}")
+        print(f"input shape: {input['target'].shape}")
+        ## FINAL output (i think)
         output = {'target': assist.organization_output[epoch]['test']}
+        print(f"output type {type(output)}")
+        print(f"output shape: {output['target'].shape}")
         output['loss'] = models.loss_fn(output['target'], input['target'])
         if cfg['data_name'] in ['MIMICM']:
             mask = input['target'] != -65535
@@ -145,16 +162,17 @@ def test(assist, metric, logger, epoch):
         print(logger.write('test', metric.metric_name['test']))
     return
 
-def add_watermark_to_dataset(mark, dataset):    
+def add_watermark_to_test_dataset(mark, dataset):    
     for i, sample in enumerate(dataset['test']):  
         altered_data, altered_target = add_watermark(mark, (sample['data'], sample['target']))
         numpy_img = (altered_data.numpy() * 255).astype(np.uint8)  
         numpy_lbl = altered_target.numpy()
-        # show_image_with_label(scaled_img , altered_target)
+        # show_image_with_two_labels(scaled_img , altered_target)
         numpy_img = np.transpose(numpy_img , (1, 2, 0))
+        dataset['test'].replace_org_target(i, sample['target'])
         dataset['test'].replace_image(i, numpy_img)
         dataset['test'].replace_target(i, numpy_lbl)
-        # show_image_with_label(dataset_copy['test'][i]['data'], dataset_copy['test'][i]['target'])
+        # show_image_with_two_labels(dataset['test'][i]['data'], dataset['test'][i]['target'], dataset['test'][i]['org_target'])
     return dataset
 
 # def add_watermark_to_dataset(mark, dataset):

@@ -27,6 +27,8 @@ class Assi:
                                     range(cfg['global']['num_epochs'] + 1)]
         self.organization_target = [{split: None for split in cfg['data_size']} for _ in
                                     range(cfg['global']['num_epochs'] + 1)]
+        self.organization_org_target = [{split: None for split in cfg['data_size']} for _ in
+                                    range(cfg['global']['num_epochs'] + 1)]
         return
 
     def make_model_name(self):
@@ -104,10 +106,10 @@ class Assi:
             data_loader[i] = make_data_loader(dataset, self.model_name[i][iter])
         return data_loader
 
-    def update(self, organization_outputs, iter):
+    def update(self, organization_outputs, epoch):
         if cfg['assist_mode'] == 'none':
             for split in organization_outputs[0]:
-                self.organization_output[iter][split] = organization_outputs[0][split]
+                self.organization_output[epoch][split] = organization_outputs[0][split]
         elif cfg['assist_mode'] == 'bag':
             _organization_outputs = {split: [] for split in organization_outputs[0]}
             for split in organization_outputs[0]:
@@ -115,16 +117,17 @@ class Assi:
                     _organization_outputs[split].append(organization_outputs[i][split])
                 _organization_outputs[split] = torch.stack(_organization_outputs[split], dim=-1)
             for split in organization_outputs[0]:
-                self.organization_output[iter][split] = _organization_outputs[split].mean(dim=-1)
+                self.organization_output[epoch][split] = _organization_outputs[split].mean(dim=-1)
         elif cfg['assist_mode'] == 'stack':
             _organization_outputs = {split: [] for split in organization_outputs[0]}
             for split in organization_outputs[0]:
                 for i in range(len(organization_outputs)):
                     _organization_outputs[split].append(organization_outputs[i][split])
                 _organization_outputs[split] = torch.stack(_organization_outputs[split], dim=-1)
+            print(f"_organization_outputs test split shape {_organization_outputs['test'].shape}")
             if 'train' in organization_outputs[0]:
                 input = {'output': _organization_outputs['train'],
-                         'target': self.organization_target[iter]['train']}
+                         'target': self.organization_target[epoch]['train']}
                 input = to_device(input, cfg['device'])
                 input['loss_mode'] = cfg['rl'][0]
                 model = eval('models.{}().to(cfg["device"])'.format(cfg['assist_mode']))
@@ -135,22 +138,22 @@ class Assi:
                     optimizer.zero_grad()
                     output['loss'].backward()
                     optimizer.step()
-                self.assist_parameters[iter] = model.to('cpu').state_dict()
+                self.assist_parameters[epoch] = model.to('cpu').state_dict()
             with torch.no_grad():
                 model = eval('models.{}().to(cfg["device"])'.format(cfg['assist_mode']))
-                model.load_state_dict(self.assist_parameters[iter])
+                model.load_state_dict(self.assist_parameters[epoch])
                 model.train(False)
                 for split in organization_outputs[0]:
                     input = {'output': _organization_outputs[split],
-                             'target': self.organization_target[iter][split]}
+                             'target': self.organization_target[epoch][split]}
                     input = to_device(input, cfg['device'])
-                    self.organization_output[iter][split] = model(input)['target'].cpu()
+                    self.organization_output[epoch][split] = model(input)['target'].cpu()
         else:
             raise ValueError('Not valid assist')
         if 'train' in organization_outputs[0]:
             if cfg['assist_rate_mode'] == 'search':
-                input = {'history': self.organization_output[iter - 1]['train'],
-                         'output': self.organization_output[iter]['train'],
+                input = {'history': self.organization_output[epoch - 1]['train'],
+                         'output': self.organization_output[epoch]['train'],
                          'target': self.organization_target[0]['train']}
                 input = to_device(input, cfg['device'])
                 model = models.linesearch().to(cfg['device'])
@@ -164,13 +167,13 @@ class Assi:
                         return output['loss']
 
                     optimizer.step(closure)
-                self.assist_rates[iter] = min(abs(model.assist_rate.item()), 300)
+                self.assist_rates[epoch] = min(abs(model.assist_rate.item()), 300)
             else:
-                self.assist_rates[iter] = cfg['linesearch']['lr']
+                self.assist_rates[epoch] = cfg['linesearch']['lr']
         with torch.no_grad():
             for split in organization_outputs[0]:
-                self.organization_output[iter][split] = self.organization_output[iter - 1][split] + self.assist_rates[
-                    iter] * self.organization_output[iter][split]
+                self.organization_output[epoch][split] = self.organization_output[epoch - 1][split] + self.assist_rates[
+                    epoch] * self.organization_output[epoch][split]
         return
 
     def update_al(self, organization_outputs, iter):

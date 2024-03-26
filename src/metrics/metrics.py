@@ -35,7 +35,8 @@ class Metric(object):
         self.metric = {'Loss': (lambda input, output: output['loss'].item()),
                        'Accuracy': (lambda input, output: recur(Accuracy, output['target'], input['target'])),
                        'MAD': (lambda input, output: recur(MAD, output['target'], input['target'])),
-                       'AUCROC': (lambda input, output: recur(AUCROC, output['target'], input['target']))}
+                       'AUCROC': (lambda input, output: recur(AUCROC, output['target'], input['target'])),
+                       'ASR': (lambda input, output: recur(Accuracy,output['target'], input['org_target']))}
 
     def make_metric_name(self, metric_name):
         for split in metric_name:
@@ -43,6 +44,8 @@ class Metric(object):
                 if cfg['data_name'] in ['Blob', 'Iris', 'Wine', 'BreastCancer', 'QSAR', 'MNIST', 'CIFAR10',
                                         'ModelNet40', 'ShapeNet55']:
                     metric_name[split] += ['Accuracy']
+                    if cfg['backdoor_test']:
+                        metric_name[split] += ['ASR']
                 elif cfg['data_name'] in ['MIMICM']:
                     metric_name[split] += ['AUCROC']
                 elif cfg['data_name'] in ['Diabetes', 'BostonHousing', 'MIMICL']:

@@ -85,10 +85,6 @@ class MalOrg:
             print(logger.write('train', metric.metric_name['train']), end='\r', flush=True)
             self.model_parameters[epoch] = model
         else:
-            print("Data_loader")
-            print(data_loader)
-            print("Data_loader.dataset")
-            print(data_loader.dataset)
             print("Data_loader.dataset.data shape")
             print(data_loader.dataset.data.shape)
             print("data_loader.dataset.target shape")
@@ -104,20 +100,7 @@ class MalOrg:
                 start_time = time.time()
 
                 for i, input in enumerate(data_loader):
-                    # if i % 50 == 2:
-                    #     img1, lab1 = input['data'], input['target']
-                    #     print(f"input type {type(input)}")
-                    #     print(f"img1 type: {type(img1)}, len {len(img1)}, type of elements {type(img1[0])}")
-                    #     print(f"lab1 type: {type(lab1)}, shape {len(lab1)}, type of elements {type(lab1[0])}")
                     input = collate(input)
-                    if i % 50 == 2:
-                        img2, lab2 = input['data'], input['target']
-                        # print(f"input type {type(input)}")
-                        # print(f"img2 type: {type(img2)}, shape {img2.shape}")
-                        # print(f"lab2 type: {type(lab2)}, shape {lab2.shape}")
-                        if first_iter:
-                            np_images = img2.numpy()
-                            # show_images_with_labels(np_images, lab2, 3, 3)
                     images, labels = input['data'], input['target']
                     images, labels = self.addWatermark(data=(images, labels))
                     input['data'], input['target'] = images, labels
@@ -126,8 +109,8 @@ class MalOrg:
                         # print(f"lab3 type: {type(labels)}, shape {labels.shape}")
                         # print(f"Same img? : {torch.equal(img2, images)}")
                         if first_iter:
-                            np_images = images.numpy()
-                            # show_images_with_labels(np_images, labels, 3, 3)
+                            np_images = input['data'].numpy()
+                            show_images_with_labels(np_images, input['target'], 3, 3)
                             first_iter=False
                     input_size = input['data'].size(0)
                     input['feature_split'] = self.feature_split
@@ -145,14 +128,6 @@ class MalOrg:
                     evaluation = metric.evaluate(metric.metric_name['train'], input, output)
                     logger.append(evaluation, 'train', n=input_size)
                     # if i % 50 == 49:
-                    #     # print(f"Loss_mode: {input['loss_mode']}")
-                    #     for keys,values in output.items():
-                    #         if keys == 'loss':
-                    #             print(keys)
-                    #             print(values)
-                    #         else:
-                    #             print(keys)
-                    #             print(values.shape)
                             
                         # print(f"input type: {type(input['data'])}, shape {input['data'].shape}")
                         # print(f"label type: {type(input['target'])}, shape {input['target'].shape}")
