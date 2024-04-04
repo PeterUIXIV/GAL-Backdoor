@@ -36,7 +36,7 @@ class Metric(object):
                        'Accuracy': (lambda input, output: recur(Accuracy, output['target'], input['target'])),
                        'MAD': (lambda input, output: recur(MAD, output['target'], input['target'])),
                        'AUCROC': (lambda input, output: recur(AUCROC, output['target'], input['target'])),
-                       'ASR': (lambda input, output: recur(Accuracy,output['target'], input['org_target']))}
+                       'ASR': (lambda input, output: recur(Accuracy, output['target'], input['org_target']))}
 
     def make_metric_name(self, metric_name):
         for split in metric_name:

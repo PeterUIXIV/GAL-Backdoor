@@ -9,7 +9,7 @@ import torch
 from marks import Watermark
 import models
 from config import cfg
-from utils import plot_classes_preds, show_images, show_images_with_labels, to_device, make_optimizer, make_scheduler, collate
+from utils import plot_classes_preds, show_images, show_images_with_labels, show_images_with_labels_and_values, to_device, make_optimizer, make_scheduler, collate
 
 classes = ('plane', 'car', 'bird', 'cat',
            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
@@ -23,9 +23,9 @@ class MalOrg:
         self.mark = mark
         self.poison_percent = poison_percent
         self.poison_ratio = self.poison_percent / (1 - self.poison_percent)
-        self.target_class = target_class
+        self.target_class = cfg['target_class'] or target_class
         print("I'm a malicious Organization")
-        print(f"with poison ratio: {self.poison_ratio}")
+        print(f"with poison ratio: {self.poison_ratio} and target class {self.target_class}")
 
     # Only main org is initialized!
     def initialize(self, dataset, metric, logger):
@@ -102,16 +102,25 @@ class MalOrg:
                 for i, input in enumerate(data_loader):
                     input = collate(input)
                     images, labels = input['data'], input['target']
-                    images, labels = self.addWatermark(data=(images, labels))
-                    input['data'], input['target'] = images, labels
                     if i % 50 == 2:
-                        # print(f"img3 type: {type(images)}, shape {images.shape}")
-                        # print(f"lab3 type: {type(labels)}, shape {labels.shape}")
-                        # print(f"Same img? : {torch.equal(img2, images)}")
-                        if first_iter:
-                            np_images = input['data'].numpy()
-                            show_images_with_labels(np_images, input['target'], 3, 3)
-                            first_iter=False
+                        org_labels = input['org_target']
+                        # if first_iter:
+                        #     indices = [0, 1, 2, 3]
+                        #     print(f"images type: {type(images)}, shape {images.shape}")
+                        #     print(f"labels type: {type(labels)}, shape {labels.shape}")
+                        #     print(f"label batch: {labels[indices]}")
+                        #     print(f"org_label batch: {org_labels[indices]}")
+                        #     np_images = input['data'].numpy()
+                        #     show_images_with_labels_and_values(np_images, org_labels, labels, 3, 3)
+                            
+                    images, labels = self.addWatermark(data=(images, labels), keep_org=False)
+                    input['data'], input['target'] = images, labels
+                    # if i % 50 == 2:
+                    #     if first_iter:
+                    #         print(f"label batch: {labels[indices]} shape {labels.shape}")
+                    #         np_images = input['data'].numpy()
+                    #         show_images_with_labels_and_values(np_images, org_labels, labels, 3, 3)
+                    #         first_iter=False
                     input_size = input['data'].size(0)
                     input['feature_split'] = self.feature_split
                     if cfg['noise'] == 'data' and self.organization_id in cfg['noised_organization_id']:
@@ -252,7 +261,9 @@ class MalOrg:
                 _input = self.add_mark(org_input[:integer])
                 _label = _label[:integer]
                 if poison_label:
-                    _label = self.target_class * torch.ones_like(org_label[:integer])
+                    _label = torch.zeros_like(org_label)
+                    _label[:integer, self.target_class] = 1
+                    # _label = self.target_class * torch.ones_like(org_label[:integer])
                 if keep_org:
                     _input = torch.cat((_input, org_input))
                     _label = torch.cat((_label, org_label))

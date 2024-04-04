@@ -18,7 +18,7 @@ from config import cfg
 from data import fetch_dataset, make_data_loader, split_dataset
 from metrics import Metric
 from assist import Assist
-from utils import collate, plot_output_preds, save, load, process_control, process_dataset, resume, show_image_with_two_labels, show_images_with_labels
+from utils import add_watermark_to_test_dataset, collate, plot_output_preds, plot_output_preds_target, save, load, process_control, process_dataset, resume, show_image_with_two_labels, show_images_with_labels
 from logger import make_logger
 from torchvision import transforms
 
@@ -39,7 +39,7 @@ cfg['control_name'] = '_'.join(
 
 def main():
     process_control()
-    cfg['backdoor_test'] = True
+    cfg['backdoor_test'] = False
     seeds = list(range(cfg['init_seed'], cfg['init_seed'] + cfg['num_experiments']))
     for i in range(cfg['num_experiments']):
         model_tag_list = [str(seeds[i]), cfg['data_name'], cfg['model_name'], cfg['control_name']]
@@ -72,7 +72,8 @@ def runExperiment():
     np_images = inputs_test.numpy()
     # show_images_with_labels(np_images, labels_test, 3, 3)
     # images, labels = add_watermark(mark=mark, data=(inputs_test, labels_test))
-    dataset_with_watermark = add_watermark_to_test_dataset(mark=mark, dataset=dataset)    
+    dataset_with_watermark = dataset
+    # dataset_with_watermark = add_watermark_to_test_dataset(mark=mark, dataset=dataset)
     
     altered_images = torch.stack([sample['data'] for sample in dataset_with_watermark['test']], dim=0)
     altered_labels = torch.tensor([sample['target'] for sample in dataset_with_watermark['test']])
@@ -86,20 +87,50 @@ def runExperiment():
     for epoch in range(1, last_epoch):
         test_logger.safe(True)
         data_loader = assist.broadcast(dataset_with_watermark, epoch)
-        print(f"data_loader type {type(data_loader)}")
-        for data in data_loader:
-            print(f"data shape {data['test'].dataset.data.shape}")
+        # print(f"data_loader type {type(data_loader)}")
         organization_outputs = gather(data_loader, organization, epoch)
-        print(f"organization_outputs type {type(organization_outputs)}")
-        for i, output in enumerate(organization_outputs):
-            print(f"output {i} type {type(output)}")
-            print(f"output {i} test shape {output['test'].shape}")
+        # for i, output in enumerate(organization_outputs):
+        #     print(f"output {i} type {type(output)}")
+        #     print(f"output {i} test shape {output['test'].shape}")
         assist.update(organization_outputs, epoch)
         test(assist, metric, test_logger, epoch)
         test_logger.safe(False)
         test_logger.reset()
-        if epoch == last_epoch:
-            print("j")
+        if epoch == last_epoch - 1:
+            targets = assist.organization_target[0]['test']
+            # print(f"targets shape {targets.shape}")
+            org_targets = assist.organization_org_target[0]['test']
+            # print(f"org_targets shape {org_targets.shape}")
+            test_target = torch.tensor(dataset_with_watermark['test'].target)
+            # print(f"test_target shape {test_target.shape}")
+            test_data = torch.tensor(dataset_with_watermark['test'].data)
+            # print(f"test_data shape {test_data.shape}")
+            output = assist.organization_output[epoch]['test']
+            
+            np_images = test_data.numpy()
+            show_images_with_labels(np_images, org_targets, 3, 3)
+            fig = plot_output_preds_target(test_data, org_targets, output, targets, 3, 3)
+            plt.show()
+            
+    # test_logger.safe(False)
+    # assist.reset()
+    # result = resume(cfg['model_tag'], load_tag='checkpoint')
+    # train_logger = result['logger'] if 'logger' in result else None
+    # save_result = {'cfg': cfg, 'epoch': last_epoch, 'assist': assist,
+    #                'logger': {'train': train_logger, 'test': test_logger}}
+    # save(save_result, './output/result/{}.pt'.format(cfg['model_tag']))
+    
+    # initialize(dataset_with_watermark, assist, organization[0], metric, test_logger, 0)
+            
+    # for epoch in range(1, last_epoch):
+    #     test_logger.safe(True)
+    #     data_loader = assist.broadcast(dataset_with_watermark, epoch)
+    #     organization_outputs = gather(data_loader, organization, epoch)
+    #     assist.update(organization_outputs, epoch)
+    #     test(assist, metric, test_logger, epoch)
+    #     test_logger.safe(False)
+    #     test_logger.reset()
+                
     test_logger.safe(False)
     assist.reset()
     result = resume(cfg['model_tag'], load_tag='checkpoint')
@@ -144,12 +175,12 @@ def test(assist, metric, logger, epoch):
         input_size = assist.organization_target[0]['test'].size(0)
         input = {'target': assist.organization_target[0]['test']}
         input['org_target'] = assist.organization_org_target[0]['test']
-        print(f"input type {type(input)}")
-        print(f"input shape: {input['target'].shape}")
+        # print(f"input type {type(input)}")
+        # print(f"input shape: {input['target'].shape}")
         ## FINAL output (i think)
         output = {'target': assist.organization_output[epoch]['test']}
-        print(f"output type {type(output)}")
-        print(f"output shape: {output['target'].shape}")
+        # print(f"output type {type(output)}")
+        # print(f"output shape: {output['target'].shape}")
         output['loss'] = models.loss_fn(output['target'], input['target'])
         if cfg['data_name'] in ['MIMICM']:
             mask = input['target'] != -65535
@@ -161,123 +192,6 @@ def test(assist, metric, logger, epoch):
         logger.append(info, 'test', mean=False)
         print(logger.write('test', metric.metric_name['test']))
     return
-
-def add_watermark_to_test_dataset(mark, dataset):    
-    for i, sample in enumerate(dataset['test']):  
-        altered_data, altered_target = add_watermark(mark, (sample['data'], sample['target']))
-        numpy_img = (altered_data.numpy() * 255).astype(np.uint8)  
-        numpy_lbl = altered_target.numpy()
-        # show_image_with_two_labels(scaled_img , altered_target)
-        numpy_img = np.transpose(numpy_img , (1, 2, 0))
-        dataset['test'].replace_org_target(i, sample['target'])
-        dataset['test'].replace_image(i, numpy_img)
-        dataset['test'].replace_target(i, numpy_lbl)
-        # show_image_with_two_labels(dataset['test'][i]['data'], dataset['test'][i]['target'], dataset['test'][i]['org_target'])
-    return dataset
-
-# def add_watermark_to_dataset(mark, dataset):
-#     print("dataset")
-#     print(dataset)
-#     print(f"dataset type {type(dataset)}")
-#     print(f"test type {type(dataset['test'])}, train type {type(dataset['train'])}")
-#     print("test dataset")
-#     print(dataset['test'])
-#     data_len = len(dataset['test'])  # Assuming all samples have the same batch size
-#     model_name = cfg['model_name']
-#     batch_size = cfg[model_name]['batch_size']['test']
-#     num_batches = (data_len + batch_size - 1) // batch_size
-#     data_loader = make_data_loader(dataset, model_name)
-#     test_loader = data_loader['test']
-#     modified_datset = {}
-#     modified_datset['train'] = dataset['train']
-#     transform = datasets.Compose([transforms.ToTensor()])
-#     modified_datset['test'] = CIFAR10(root='./data/{}'.format('CIFAR10'), split='test', transform=transform)
-#     print(f"test type {type(modified_datset['test'])}, train type {type(modified_datset['train'])}")
-    
-    
-#     for i, data in enumerate(test_loader):
-#         data = collate(data)
-#         print(f"data shape {data['data'].shape}, target shape {data['target'].shape}")
-#         # np_images = data['data'].numpy()
-#         # show_images_with_labels(data['data'], data['target'], 3, 3)
-#         print(f"data type {type(data['data'])} target type {type(data['target'])}")
-#         _input, _label = add_watermark(mark=mark, data=(data['data'], data['target']))
-#         show_images_with_labels(_input, _label, 3, 3)
-#         modified_datset['test'][i]['data'] = _input
-#         modified_datset['test'][i]['target'] = _label
-#         show_images_with_labels(modified_datset['test'][i]['data'], modified_datset['test'][i]['target'], 3, 3)
-#         # data = [(input_data, label) for input_data, label in zip(_input, _label)]
-        
-#     # for i in range(num_batches):
-#     #     start_idx = i * batch_size
-#     #     end_idx = min((i + 1) * batch_size, data_len)
-
-#     #     batch_data = [sample['data'] for sample in dataset['test'][start_idx:end_idx]]
-#     #     batch_labels = [sample['target'] for sample in dataset['test'][start_idx:end_idx]]
-
-#     #     watermarked_batch_data, watermarked_batch_labels = add_watermark(mark=mark, data=(batch_data, batch_labels))
-
-#     #     for j, idx in enumerate(range(start_idx, end_idx)):
-#     #         dataset['test'][idx]['data'] = watermarked_batch_data[j]
-#     #         dataset['test'][idx]['target'] = watermarked_batch_labels[j]
-#     # print("data")
-#     # print(type(data))
-#     # print(len((data)))
-
-#     return dataset
-
-def add_watermark(mark: Watermark, data: tuple[torch.Tensor, torch.Tensor],
-                 org: bool = False, keep_org: bool = True,
-                 poison_label: bool = True, **kwargs
-                 ) -> tuple[torch.Tensor, torch.Tensor]:
-        r"""addWatermark.
-
-        Args:
-            data (tuple[torch.Tensor, torch.Tensor]): Tuple of input and label tensors.
-            org (bool): Whether to return original clean data directly.
-                Defaults to ``False``.
-            keep_org (bool): Whether to keep original clean data in final results.
-                If ``False``, the results are all infected.
-                Defaults to ``True``.
-            poison_label (bool): Whether to use target class label for poison data.
-                Defaults to ``True``.
-            **kwargs: Any keyword argument (unused).
-
-        Returns:
-            (torch.Tensor, torch.Tensor): Result tuple of input and label tensors.
-        """
-        _input, _label = data
-        single_image = False
-        if _label.dim() < 1:
-            single_image = True
-            _label = _label.unsqueeze(0)
-        if not org:
-            if keep_org:
-                decimal, integer = math.modf(len(_label) * cfg['poison_ratio'])                    
-                integer = int(integer)
-                if random.uniform(0, 1) < decimal:
-                    integer += 1
-            else:
-                integer = len(_label)
-            if not keep_org or integer:
-                org_input, org_label = _input, _label
-                # show_image_with_label(_input, _label)
-                if single_image:
-                    _input = mark.add_mark(org_input)
-                else:
-                    _input = mark.add_mark(org_input[:integer])
-                    _label = _label[:integer]
-                if poison_label:
-                    _label = cfg['target_class'] * torch.ones_like(org_label[:integer])
-                if keep_org and not single_image:
-                    _input = torch.cat((_input, org_input))
-                    _label = torch.cat((_label, org_label))
-                # show_image_with_label(_input, _label)
-                    
-        if single_image:
-            _label = _label.squeeze(0)
-        return _input, _label
-
 
 if __name__ == "__main__":
     main()

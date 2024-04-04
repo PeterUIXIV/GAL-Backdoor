@@ -1,5 +1,7 @@
 import collections.abc as container_abcs
 import errno
+import math
+import random
 from matplotlib import pyplot as plt
 import numpy as np
 import os
@@ -14,6 +16,7 @@ from torchvision.utils import save_image
 from config import cfg
 from torch.nn.utils.rnn import pad_sequence
 
+from marks import Watermark
 from models.conv import Conv
 
 
@@ -388,6 +391,28 @@ def show_images_with_labels(images, labels, nrows, ncols):
         ax.set_title(f"Label: {label}")
     plt.show()
     
+def show_images_with_labels_and_values(images, labels, values, nrows, ncols):
+    fig, axes = plt.subplots(nrows, ncols, figsize=(10, 10))
+    for i, ax in enumerate(axes.flat):
+        image = images[i]
+        if image.shape != (32, 32, 3):
+            image = np.transpose(image, (1, 2, 0))
+        ax.imshow(image)
+        ax.axis('off')
+        # Convert one-hot encoded label to original label
+        if labels.dim() > 1:
+            label_idx = torch.argmax(labels[i])
+            label = classes[label_idx]
+        else:
+            label = classes[labels[i].item()]
+        if values.dim() > 1:
+            label_idx = torch.argmax(values[i])
+            value = classes[label_idx]
+        else:
+            value = classes[values[i].item()]
+        ax.set_title(f"Label: {label}\n value: {value}\n value: {label_idx}")
+    plt.show()
+    
 # def images_to_probs(net, images):
 #     '''
 #     Generates predictions and corresponding probabilities from a trained
@@ -414,7 +439,7 @@ def images_to_probs(net, images):
         max_prob = max_prob.cpu().numpy()
     return pred, max_prob
 
-def matplotlib_imshow(img: torch.Tensor, normalize=False):
+def matplotlib_imshow(img: torch.Tensor, ax, normalize=False):
     if normalize:
         img = img / 2 + 0.5     # unnormalize
     npimg = img.cpu().numpy()
@@ -422,11 +447,11 @@ def matplotlib_imshow(img: torch.Tensor, normalize=False):
     # Check if the image is grayscale or color
     if npimg.shape[0] == 1:  # Grayscale image
         npimg = npimg.squeeze()  # Remove the channel dimension
-        plt.imshow(npimg, cmap='gray')
+        ax.imshow(npimg, cmap='gray')
     else:
         if npimg.shape != (32, 32, 3):
             npimg = np.transpose(npimg, (1, 2, 0))
-        plt.imshow(npimg)
+        ax.imshow(npimg)
 
 # def plot_classes_preds(net, images, labels):
 #     '''
@@ -502,7 +527,7 @@ def plot_output_preds(images: torch.Tensor, labels: torch.Tensor, output: torch.
         
     fig, axes = plt.subplots(nrows, ncols, figsize=(10, 10))
     for i, ax in enumerate(axes.flat):
-        matplotlib_imshow(images[i], normalize=False)
+        matplotlib_imshow(images[i], ax, normalize=False)
         true_class_name = classes[labels[i].item()]
         pred_class_name = classes[preds[i]]
         pred_prob = probs[i] * 100.0
@@ -512,6 +537,27 @@ def plot_output_preds(images: torch.Tensor, labels: torch.Tensor, output: torch.
             pred_prob,
             true_class_name),
             color=("green" if pred_class_name == true_class_name else "red"))
+    plt.tight_layout()
+    return fig
+
+def plot_output_preds_target(images: torch.Tensor, labels: torch.Tensor, output: torch.Tensor, target: torch.Tensor, nrows: int, ncols: int):
+    preds, probs = output_to_preds(output)
+        
+    fig, axes = plt.subplots(nrows, ncols, figsize=(10, 10))
+    for i, ax in enumerate(axes.flat):
+        matplotlib_imshow(images[i], ax, normalize=False)
+        true_class_name = classes[labels[i].item()]
+        pred_class_name = classes[preds[i]]
+        pred_prob = probs[i] * 100.0
+        target_class_name = classes[target[i]]
+        
+        ax.set_title("{0}, {1:.1f}%\n(label: {2})\n(target: {3})".format(
+            pred_class_name,
+            pred_prob,
+            true_class_name,
+            target_class_name),
+            color=("green" if pred_class_name == true_class_name else "red"))
+    plt.tight_layout()
     return fig
 
 def print_classes_preds(labels: torch.Tensor, output: torch.Tensor):
@@ -596,3 +642,76 @@ def show_image_with_two_labels(image_tensor, true_label, target_label):
     # Show plot
     plt.axis('off')
     plt.show()
+    
+def add_watermark_to_test_dataset(mark, dataset):
+    fail_count = 0
+    for i, sample in enumerate(dataset['test']):  
+        altered_data, altered_target = add_watermark(mark=mark, data=(sample['data'], sample['target']))
+        numpy_img = (altered_data.numpy() * 255).astype(np.uint8)  
+        numpy_lbl = altered_target.numpy()
+        # show_image_with_two_labels(scaled_img , altered_target)
+        numpy_img = np.transpose(numpy_img , (1, 2, 0))
+        dataset['test'].replace_org_target(i, sample['target'])
+        dataset['test'].replace_image(i, numpy_img)
+        dataset['test'].replace_target(i, numpy_lbl)
+        if dataset['test'][i]['target'] != cfg['target_class']:
+            fail_count += 1
+            print(f"FAIL: {fail_count}, sample: {sample['target']}, sampe type {type(sample['target'])}, i: {i}")
+        # show_image_with_two_labels(dataset['test'][i]['data'], dataset['test'][i]['target'], dataset['test'][i]['org_target'])
+    return dataset
+
+def add_watermark(mark: Watermark, data: tuple[torch.Tensor, torch.Tensor],
+                 org: bool = False, keep_org: bool = True,
+                 poison_label: bool = True, **kwargs
+                 ) -> tuple[torch.Tensor, torch.Tensor]:
+        r"""addWatermark.
+
+        Args:
+            data (tuple[torch.Tensor, torch.Tensor]): Tuple of input and label tensors.
+            org (bool): Whether to return original clean data directly.
+                Defaults to ``False``.
+            keep_org (bool): Whether to keep original clean data in final results.
+                If ``False``, the results are all infected.
+                Defaults to ``True``.
+            poison_label (bool): Whether to use target class label for poison data.
+                Defaults to ``True``.
+            **kwargs: Any keyword argument (unused).
+
+        Returns:
+            (torch.Tensor, torch.Tensor): Result tuple of input and label tensors.
+        """
+        _input, _label = data
+        single_image = False
+        if _label.dim() < 1:
+            single_image = True
+            _label = _label.unsqueeze(0)
+        if not org:
+            if keep_org:
+                decimal, integer = math.modf(len(_label) * cfg['poison_ratio'])                    
+                integer = int(integer)
+                if random.uniform(0, 1) < decimal:
+                    integer += 1
+            else:
+                integer = len(_label)
+            if not keep_org or integer:
+                org_input, org_label = _input, _label
+                # show_image_with_label(_input, _label)
+                if single_image:
+                    _input = mark.add_mark(org_input)
+                    if poison_label:
+                        _label = cfg['target_class'] * torch.ones_like(org_label[:integer])
+                else:
+                    _input = mark.add_mark(org_input[:integer])
+                    _label = _label[:integer]
+                    if poison_label:
+                        _label = torch.zeros_like(org_label)
+                        _label[:integer, cfg['target_class']] = 1
+                        # _label = cfg['target_class'] * torch.ones_like(org_label[:integer])
+                if keep_org and not single_image:
+                    _input = torch.cat((_input, org_input))
+                    _label = torch.cat((_label, org_label))
+                # show_image_with_label(_input, _label)
+                    
+        if single_image:
+            _label = _label.squeeze(0)
+        return _input, _label

@@ -25,15 +25,19 @@ class CIFAR10(Dataset):
         self.classes_counts = make_classes_counts(self.target)
         self.classes_to_labels, self.target_size = load(os.path.join(self.processed_folder, 'meta.pt'), mode='pickle')
         self.other = {'id': id}
-        self.org_target = [None] * self.__len__()
+        # self.org_target = [None] * self.__len__()
+        self.org_target = self.target
 
     def __getitem__(self, index):
         data, target = Image.fromarray(self.data[index]), torch.tensor(self.target[index])
         other = {k: torch.tensor(self.other[k][index]) for k in self.other}
-        input = {**other, 'data': data, 'target': target}
+        # input = {**other, 'data': data, 'target': target}
+        org_target = torch.tensor(self.org_target[index])
+        input = {**other, 'data': data, 'target': target, 'org_target': org_target}
         
-        if self.org_target is not None and self.org_target[index] is not None:
-            input['org_target'] = self.org_target[index].clone().detach()
+        
+        # if self.org_target is not None and self.org_target[index] is not None:
+        #     input['org_target'] = self.org_target[index].clone().detach()
 
         
         if self.transform is not None:

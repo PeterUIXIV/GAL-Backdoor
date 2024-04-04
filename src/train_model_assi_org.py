@@ -1,6 +1,8 @@
 import argparse
 import copy
 import datetime
+
+from matplotlib import pyplot as plt
 from marks import Watermark
 import json
 from assi import Assi
@@ -15,7 +17,7 @@ import torch.backends.cudnn as cudnn
 from config import cfg
 from data import fetch_dataset, make_data_loader, split_dataset
 from metrics import Metric
-from utils import evaluate_predictions, print_classes_preds, save, load, process_control, process_dataset, resume
+from utils import add_watermark_to_test_dataset, evaluate_predictions, plot_output_preds, plot_output_preds_target, print_classes_preds, save, load, process_control, process_dataset, resume, show_images_with_labels
 from logger import make_logger
 
 cudnn.benchmark = True
@@ -74,6 +76,14 @@ def runExperiment():
     print(f"MalOrg id: {organization[-1].organization_id}")
     print(f"MalOrg feature_split size: {organization[-1].feature_split.size()}")
     print(f"MalOrg model_name: {organization[-1].model_name}")
+        
+    # dataset = add_watermark_to_test_dataset(mark=mark, dataset=dataset)
+    
+    # altered_images = torch.stack([sample['data'] for sample in dataset['test']], dim=0)
+    # altered_labels = torch.tensor([sample['target'] for sample in dataset['test']])
+    # np_images = altered_images.numpy()
+    # show_images_with_labels(np_images, altered_labels, 3, 3)
+    
     metric = Metric({'train': ['Loss'], 'test': ['Loss']})
     if cfg['resume_mode'] == 1:
         result = resume(cfg['model_tag'])
@@ -108,6 +118,22 @@ def runExperiment():
             shutil.copy('./output/model/{}_checkpoint.pt'.format(cfg['model_tag']),
                         './output/model/{}_best.pt'.format(cfg['model_tag']))
         logger.reset()
+        if epoch == cfg['global']['num_epochs']:
+            targets = assist.organization_target[0]['test']
+            # print(f"targets shape {targets.shape}")
+            org_targets = assist.organization_org_target[0]['test']
+            # print(f"org_targets shape {org_targets.shape}")
+            test_target = torch.tensor(dataset['test'].target)
+            # print(f"test_target shape {test_target.shape}")
+            test_data = torch.tensor(dataset['test'].data)
+            # print(f"test_data shape {test_data.shape}")
+            output = assist.organization_output[epoch]['test']
+            
+            np_images = test_data.numpy()
+            # show_images_with_labels(np_images, org_targets, 3, 3)
+            # fig = plot_output_preds_target(test_data, org_targets, output, targets, 3, 3)
+            fig = plot_output_preds(test_data, targets, output, 3, 3)
+            plt.show()
     logger.safe(False)
     return
 
@@ -115,6 +141,7 @@ def runExperiment():
 def initialize(dataset, assist, organization, metric, logger, epoch):
     logger.safe(True)
     initialization = organization.initialize(dataset, metric, logger)
+    # print(f"intialization {initialization} type {type(initialization)}")
     info = {'info': ['Model: {}'.format(cfg['model_tag']),
                      'Train Epoch: {}'.format(epoch), 'ID: 1']}
     logger.append(info, 'train', mean=False)
@@ -136,7 +163,12 @@ def initialize(dataset, assist, organization, metric, logger, epoch):
 def train(data_loader, organization, metric, logger, epoch):
     start_time = time.time()
     num_organizations = len(organization)
+    fuck_count = 0
     for i in range(num_organizations):
+        # for j, input in enumerate(data_loader[i]['train']):
+        #     if input['target'] != 'plane':
+        #         fuck_count += 1
+        #         print(f"FUCK: {fuck_count}, target: {input['target']}, j: {j}")
         organization[i].train(epoch, data_loader[i]['train'], metric, logger)
         if i % int((num_organizations * cfg['log_interval']) + 1) == 0:
             local_time = (time.time() - start_time) / (i + 1)
@@ -174,22 +206,22 @@ def test(assist, metric, logger, epoch):
             output['target'] = output['target'].softmax(dim=-1)[:, 1]
             output['target'], input['target'] = output['target'][mask], input['target'][mask]
         
-        print("Input:")
-        # print(f"ids: {input['id'][0]}, {input['id'][1]} {input['id'][2]}")
-        for key in input:
-            if type(input[key]) == torch.Tensor:
-                print(f"key: {key}, value shape: {input[key].shape}")
-            else:
-                print(f"key: {key}, value {input[key]}")
-        print("Output:")
-        for key in output:
-            print(f"key: {key}, value shape: {output[key].shape}")
-        print_classes_preds(labels=input['target'], output=output['target'])
+        # print("Input:")
+        # # print(f"ids: {input['id'][0]}, {input['id'][1]} {input['id'][2]}")
+        # for key in input:
+        #     if type(input[key]) == torch.Tensor:
+        #         print(f"key: {key}, value shape: {input[key].shape}")
+        #     else:
+        #         print(f"key: {key}, value {input[key]}")
+        # print("Output:")
+        # for key in output:
+        #     print(f"key: {key}, value shape: {output[key].shape}")
+        # print_classes_preds(labels=input['target'], output=output['target'])
         
-        evaluation_result = evaluate_predictions(input['target'], output['target'])
-        print("Evaluation Metrics:")
-        for sk_metric, value in evaluation_result.items():
-            print(f"{sk_metric}: {value:.4f}")
+        # evaluation_result = evaluate_predictions(input['target'], output['target'])
+        # print("Evaluation Metrics:")
+        # for sk_metric, value in evaluation_result.items():
+        #     print(f"{sk_metric}: {value:.4f}")
             
         evaluation = metric.evaluate(metric.metric_name['test'], input, output)
         logger.append(evaluation, 'test', n=input_size)

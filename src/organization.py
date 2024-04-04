@@ -7,7 +7,7 @@ import time
 import torch
 import models
 from config import cfg
-from utils import plot_classes_preds, print_classes_preds, to_device, make_optimizer, make_scheduler, collate
+from utils import plot_classes_preds, to_device, make_optimizer, make_scheduler, collate
 
 
 class Organization:
