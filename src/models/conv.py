@@ -1,3 +1,5 @@
+from matplotlib import pyplot as plt
+import numpy as np
 import torch
 import torch.nn as nn
 from config import cfg
@@ -40,6 +42,12 @@ class Conv(nn.Module):
         x = normalize(x)
         if 'feature_split' in input:
             x = feature_split(x, input['feature_split'])
+        
+        # np_images = x.cpu().numpy()
+        # if np_images[0][0][0][30].item() != 0:
+        #     print(f"[0][0][0][30] {np_images[0][0][0][30].item()}")
+        #     print(f"first np_image: {np_images[0]}, shape: {np_images[0].shape}")
+        #     show_images_with_labels_and_values(np_images, input['target'], input['org_target'], 3, 3)
         x = self.blocks(x)
         output['target'] = self.linear(x)
         if 'target' in input:
@@ -73,3 +81,29 @@ def conv():
         raise ValueError('Not valid assist mode')
     model.apply(init_param)
     return model
+
+classes = ('plane', 'car', 'bird', 'cat',
+           'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+
+def show_images_with_labels_and_values(images, labels, values, nrows, ncols):
+    fig, axes = plt.subplots(nrows, ncols, figsize=(10, 10))
+    for i, ax in enumerate(axes.flat):
+        image = images[i]
+        if image.shape != (32, 32, 3):
+            image = np.transpose(image, (1, 2, 0))
+        ax.imshow(image)
+        ax.axis('off')
+        # Convert one-hot encoded label to original label
+        if labels.dim() > 1:
+            label_idx = torch.argmax(labels[i])
+            label = classes[label_idx]
+        else:
+            label = classes[labels[i].item()]
+        if values.dim() > 1:
+            label_idx = torch.argmax(values[i])
+            value = classes[label_idx]
+        else:
+            value = classes[values[i].item()]
+        ax.set_title(f"Label: {label}\n value: {value}\n value: {label_idx}")
+    plt.show()
+    

@@ -42,8 +42,12 @@ def feature_split(input, feature_split):
         mask[feature_split] = 1
         output = torch.masked_fill(input, mask == 0, 0)
     elif cfg['data_name'] in ['MNIST', 'CIFAR10']:
+        # print(f"input shape {input.shape}")
+        # print(f"feature_split shape {feature_split.shape} type {type(feature_split)}")
         num_features = np.prod(cfg['data_shape']).item()
+        # print(f"num_features {num_features}")
         mask = torch.zeros(num_features, device=input.device)
+        # print(f"mask shape: {mask.shape}")
         mask[feature_split] = 1
         mask = mask.view(cfg['data_shape'])
         output = torch.masked_fill(input, mask == 0, 0)

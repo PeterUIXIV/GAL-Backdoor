@@ -65,10 +65,8 @@ def runExperiment():
     
     poison_percent = cfg['poison_percent']
     # Data_shape is only used to create the mark
-    # TODO: data shape from dataset
-                # data_shape = [3, 32, 32]
     data_shape = dataset['train'].data.shape
-    mark = Watermark(data_shape=data_shape)
+    mark = Watermark(data_shape=data_shape, mark_width_offset=cfg['mark_width_offset'])
     organization = assist.make_organization(mark, poison_percent)
     print(f"Organization id: {organization[0].organization_id}")
     print(f"Organization feature_split size: {organization[0].feature_split.size()}")

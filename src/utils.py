@@ -257,6 +257,7 @@ def process_control():
     cfg['target_class'] = int(cfg['backdoor']['target_class'])
     cfg['mark_path'] = cfg['mark']['mark_path']
     cfg['backdoor_test'] = False
+    cfg['mark_width_offset'] = cfg['mark']['width_offset']
     return
 
 
@@ -646,7 +647,7 @@ def show_image_with_two_labels(image_tensor, true_label, target_label):
 def add_watermark_to_test_dataset(mark, dataset):
     fail_count = 0
     for i, sample in enumerate(dataset['test']):  
-        altered_data, altered_target = add_watermark(mark=mark, data=(sample['data'], sample['target']))
+        altered_data, altered_target = add_watermark(mark=mark, data=(sample['data'], sample['target']), keep_org=False)
         numpy_img = (altered_data.numpy() * 255).astype(np.uint8)  
         numpy_lbl = altered_target.numpy()
         # show_image_with_two_labels(scaled_img , altered_target)

@@ -104,8 +104,8 @@ class MalOrg:
                     images, labels = input['data'], input['target']
                     if i % 50 == 2:
                         org_labels = input['org_target']
-                        # if first_iter:
-                        #     indices = [0, 1, 2, 3]
+                        if first_iter:
+                            indices = [0, 1, 2, 3]
                         #     print(f"images type: {type(images)}, shape {images.shape}")
                         #     print(f"labels type: {type(labels)}, shape {labels.shape}")
                         #     print(f"label batch: {labels[indices]}")
@@ -113,14 +113,14 @@ class MalOrg:
                         #     np_images = input['data'].numpy()
                         #     show_images_with_labels_and_values(np_images, org_labels, labels, 3, 3)
                             
-                    images, labels = self.addWatermark(data=(images, labels), keep_org=False)
+                    images, labels = self.addWatermark(data=(images, labels), replace_org=True)
                     input['data'], input['target'] = images, labels
-                    # if i % 50 == 2:
-                    #     if first_iter:
-                    #         print(f"label batch: {labels[indices]} shape {labels.shape}")
-                    #         np_images = input['data'].numpy()
-                    #         show_images_with_labels_and_values(np_images, org_labels, labels, 3, 3)
-                    #         first_iter=False
+                    if i % 50 == 2:
+                        if first_iter:
+                            # print(f"label batch: {labels[indices]} shape {labels.shape}")
+                            np_images = input['data'].numpy()
+                            # show_images_with_labels_and_values(np_images, org_labels, labels, 3, 3)
+                            first_iter=False
                     input_size = input['data'].size(0)
                     input['feature_split'] = self.feature_split
                     if cfg['noise'] == 'data' and self.organization_id in cfg['noised_organization_id']:
@@ -227,7 +227,7 @@ class MalOrg:
 
     def addWatermark(self, data: tuple[torch.Tensor, torch.Tensor],
                  org: bool = False, keep_org: bool = True,
-                 poison_label: bool = True, **kwargs
+                 poison_label: bool = True, replace_org: bool = True, **kwargs
                  ) -> tuple[torch.Tensor, torch.Tensor]:
         r"""addWatermark.
 
@@ -261,10 +261,13 @@ class MalOrg:
                 _input = self.add_mark(org_input[:integer])
                 _label = _label[:integer]
                 if poison_label:
-                    _label = torch.zeros_like(org_label)
+                    _label = torch.zeros_like(org_label[:integer])
                     _label[:integer, self.target_class] = 1
                     # _label = self.target_class * torch.ones_like(org_label[:integer])
-                if keep_org:
+                if replace_org:
+                    _input = torch.cat((_input, org_input[integer:]))
+                    _label = torch.cat((_label, org_label[integer:]))
+                elif keep_org:
                     _input = torch.cat((_input, org_input))
                     _label = torch.cat((_label, org_label))
         return _input, _label
