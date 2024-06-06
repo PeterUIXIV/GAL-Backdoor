@@ -67,13 +67,13 @@ def runExperiment():
     labels_test = torch.tensor([sample['target'] for sample in dataset['test']])
     
     data_shape = dataset['test'].data.shape
-    mark = Watermark(data_shape=data_shape)
+    mark = Watermark(data_shape=data_shape, mark_width_offset=cfg['mark_width_offset'])
     
     np_images = inputs_test.numpy()
     # show_images_with_labels(np_images, labels_test, 3, 3)
     # images, labels = add_watermark(mark=mark, data=(inputs_test, labels_test))
-    dataset_with_watermark = dataset
-    # dataset_with_watermark = add_watermark_to_test_dataset(mark=mark, dataset=dataset)
+    # dataset_with_watermark = dataset
+    dataset_with_watermark = add_watermark_to_test_dataset(mark=mark, dataset=dataset, keep_org=False)
     
     altered_images = torch.stack([sample['data'] for sample in dataset_with_watermark['test']], dim=0)
     altered_labels = torch.tensor([sample['target'] for sample in dataset_with_watermark['test']])

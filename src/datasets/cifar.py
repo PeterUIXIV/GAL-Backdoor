@@ -26,7 +26,7 @@ class CIFAR10(Dataset):
         self.classes_to_labels, self.target_size = load(os.path.join(self.processed_folder, 'meta.pt'), mode='pickle')
         self.other = {'id': id}
         # self.org_target = [None] * self.__len__()
-        self.org_target = self.target
+        self.org_target = np.copy(self.target)
 
     def __getitem__(self, index):
         data, target = Image.fromarray(self.data[index]), torch.tensor(self.target[index])
@@ -100,8 +100,8 @@ class CIFAR10(Dataset):
     def replace_target(self, index, new_target):
         self.target[index] = new_target
         
-    def replace_org_target(self, index, org_target): 
-        self.org_target[index] = org_target
+    # def replace_org_target(self, index, org_target): 
+    #     self.org_target[index] = org_target
         
 
 def read_pickle_file(path, filenames):

@@ -14,11 +14,14 @@ import time
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
+from PIL import Image
 from config import cfg
 from data import fetch_dataset, make_data_loader, split_dataset
 from metrics import Metric
 from utils import add_watermark_to_test_dataset, evaluate_predictions, plot_output_preds, plot_output_preds_target, print_classes_preds, save, load, process_control, process_dataset, resume, show_images_with_labels
 from logger import make_logger
+
+# python train_model_assi_org.py --data_name CIFAR10 --model_name conv --control_name 2_stack_10_10_search_0
 
 cudnn.benchmark = True
 parser = argparse.ArgumentParser(description='cfg')
@@ -75,13 +78,27 @@ def runExperiment():
     print(f"MalOrg feature_split size: {organization[-1].feature_split.size()}")
     print(f"MalOrg model_name: {organization[-1].model_name}")
         
-    # dataset = add_watermark_to_test_dataset(mark=mark, dataset=dataset)
+    # dataset = add_watermark_to_test_dataset(mark=mark, dataset=dataset, keep_org=False)
     
     # altered_images = torch.stack([sample['data'] for sample in dataset['test']], dim=0)
     # altered_labels = torch.tensor([sample['target'] for sample in dataset['test']])
     # np_images = altered_images.numpy()
     # show_images_with_labels(np_images, altered_labels, 3, 3)
+    # show_images_with_labels(np_images[9:], altered_labels[9:], 3, 3)
     
+    # folder = "output/imgs"
+    # os.makedirs(folder, exist_ok=True)
+    # for i in range(18):
+    #     file_path = os.path.join(folder, f"marked_pic_{i}.png")
+    #     print(np_images[i].shape)
+    #     array = np.transpose(np_images[i], (1, 2, 0))
+    #     print(array.shape)
+    #     if array.dtype != np.uint8:
+    #         array = (array * 255).astype(np.uint8) if array.dtype == np.float32 else array.astype(np.uint8)
+        
+    #     im = Image.fromarray(array)
+    #     im.save(file_path)
+        
     metric = Metric({'train': ['Loss'], 'test': ['Loss']})
     if cfg['resume_mode'] == 1:
         result = resume(cfg['model_tag'])

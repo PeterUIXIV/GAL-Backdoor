@@ -62,48 +62,54 @@ class Assi:
                 organization[i] = MalOrg(organization_id=i, feature_split=feature_split_i, model_name=model_name_i, mark=mark, poison_percent=poison_percent)
         return organization
 
-    def broadcast(self, dataset, iter):
+    def broadcast(self, dataset, epoch):
         # print(dataset)
         for split in dataset:
-            self.organization_output[iter - 1][split].requires_grad = True
-            loss = models.loss_fn(self.organization_output[iter - 1][split],
+            self.organization_output[epoch - 1][split].requires_grad = True
+            loss = models.loss_fn(self.organization_output[epoch - 1][split],
                                   self.organization_target[0][split], reduction='sum')
             loss.backward()
-            self.organization_target[iter][split] = - copy.deepcopy(self.organization_output[iter - 1][split].grad)
+            # print(f"self.organization_target {epoch} split: {split}: {self.organization_target[epoch][split]}")
+            # print(f"self.organization_output {epoch-1} split: {split}: {self.organization_output[epoch-1][split]} shape {self.organization_output[epoch-1][split].shape}")
+            # print(f"self.organization_output_grad {epoch-1} split: {split}: {self.organization_output[epoch - 1][split].grad} type {type(self.organization_output[epoch - 1][split].grad)}")
+            self.organization_target[epoch][split] = - copy.deepcopy(self.organization_output[epoch - 1][split].grad)
+            # print(f"self.organization_target {epoch} split: {split}: {self.organization_target[epoch][split]} shape {self.organization_target[epoch][split].shape}")
+            
             if cfg['data_name'] in ['MIMICL', 'MIMICM']:
                 if 'dl' in cfg and cfg['dl'] == '1':
-                    target = self.organization_target[iter][split].unsqueeze(1).numpy()
+                    target = self.organization_target[epoch][split].unsqueeze(1).numpy()
                     if 'pl' in cfg and cfg['pl'] != 'none':
                         target = make_privacy(target, cfg['pl_mode'], cfg['pl_param'])
                     target = np.split(target, np.cumsum(dataset[split].length), axis=0)
-                    if iter == 1:
+                    if epoch == 1:
                         dataset[split].target = target
                     else:
                         dataset[split].target = [np.concatenate([dataset[split].target[i], target[i]], axis=1) for i in
                                                  range(len(dataset[split].target))]
                 else:
-                    target = self.organization_target[iter][split].numpy()
+                    target = self.organization_target[epoch][split].numpy()
                     if 'pl' in cfg and cfg['pl'] != 'none':
                         target = make_privacy(target, cfg['pl_mode'], cfg['pl_param'])
                     dataset[split].target = np.split(target, np.cumsum(dataset[split].length), axis=0)
             else:
                 if 'dl' in cfg and cfg['dl'] == '1':
-                    target = self.organization_target[iter][split].unsqueeze(1).numpy()
+                    target = self.organization_target[epoch][split].unsqueeze(1).numpy()
                     if 'pl' in cfg and cfg['pl'] != 'none':
                         target = make_privacy(target, cfg['pl_mode'], cfg['pl_param'])
-                    if iter == 1:
+                    if epoch == 1:
                         dataset[split].target = target
                     else:
                         dataset[split].target = np.concatenate([dataset[split].target, target], axis=1)
                 else:
-                    target = self.organization_target[iter][split].numpy()
+                    target = self.organization_target[epoch][split].numpy()
+                    # print(f"target: {target} shape {len(target)}")
                     if 'pl' in cfg and cfg['pl'] != 'none':
                         target = make_privacy(target, cfg['pl_mode'], cfg['pl_param'])
                     dataset[split].target = target
-            self.organization_output[iter - 1][split].detach_()
+            self.organization_output[epoch - 1][split].detach_()
         data_loader = [None for _ in range(len(self.feature_split))]
         for i in range(len(self.feature_split)):
-            data_loader[i] = make_data_loader(dataset, self.model_name[i][iter])
+            data_loader[i] = make_data_loader(dataset, self.model_name[i][epoch])
         return data_loader
 
     def update(self, organization_outputs, epoch):
@@ -142,12 +148,19 @@ class Assi:
             with torch.no_grad():
                 model = eval('models.{}().to(cfg["device"])'.format(cfg['assist_mode']))
                 model.load_state_dict(self.assist_parameters[epoch])
+                print(f"self.assist_parameters epoch {epoch}: {self.assist_parameters[epoch]}")
                 model.train(False)
+                indices = [0, 1, 2]
                 for split in organization_outputs[0]:
                     input = {'output': _organization_outputs[split],
                              'target': self.organization_target[epoch][split]}
                     input = to_device(input, cfg['device'])
                     self.organization_output[epoch][split] = model(input)['target'].cpu()
+                    if split == 'test':
+                        print(f"_organization_outputs: {_organization_outputs['test'][indices]}, shape {_organization_outputs['test'].shape}")
+                        print(f"self.organization_target {epoch} split {split}: {self.organization_target[epoch][split][indices]}, shape {self.organization_target[epoch][split].shape}")
+                        print(f"self.organization_output {epoch} split {split}: {self.organization_output[epoch][split][indices]}, shape {self.organization_output[epoch][split].shape}")
+                        
         else:
             raise ValueError('Not valid assist')
         if 'train' in organization_outputs[0]:

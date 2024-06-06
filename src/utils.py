@@ -644,15 +644,15 @@ def show_image_with_two_labels(image_tensor, true_label, target_label):
     plt.axis('off')
     plt.show()
     
-def add_watermark_to_test_dataset(mark, dataset):
+def add_watermark_to_test_dataset(mark, dataset, keep_org):
     fail_count = 0
-    for i, sample in enumerate(dataset['test']):  
-        altered_data, altered_target = add_watermark(mark=mark, data=(sample['data'], sample['target']), keep_org=False)
+    for i, sample in enumerate(dataset['test']):
+        altered_data, altered_target = add_watermark(mark=mark, data=(sample['data'], sample['target']), keep_org=keep_org)
         numpy_img = (altered_data.numpy() * 255).astype(np.uint8)  
         numpy_lbl = altered_target.numpy()
         # show_image_with_two_labels(scaled_img , altered_target)
         numpy_img = np.transpose(numpy_img , (1, 2, 0))
-        dataset['test'].replace_org_target(i, sample['target'])
+        # dataset['test'].replace_org_target(i, sample['target'])
         dataset['test'].replace_image(i, numpy_img)
         dataset['test'].replace_target(i, numpy_lbl)
         if dataset['test'][i]['target'] != cfg['target_class']:
