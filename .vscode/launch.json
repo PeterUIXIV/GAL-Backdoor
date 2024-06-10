@@ -1,0 +1,17 @@
+{
+    // --data_name CIFAR10 --model_name conv --control_name 2_stack_10_10_search_0
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Current File with Arguments",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/train_model_assi_org.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "args": "${command:pickArgs}"
+        }
+    ]
+}

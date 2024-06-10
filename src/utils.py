@@ -16,7 +16,7 @@ from torchvision.utils import save_image
 from config import cfg
 from torch.nn.utils.rnn import pad_sequence
 
-from marks import Watermark
+from marks.watermark import Watermark
 from models.conv import Conv
 
 
@@ -249,15 +249,21 @@ def process_control():
     cfg['global'] = {}
     cfg['global']['num_epochs'] = cfg['global_epoch']
     cfg['stats'] = make_stats()
-    ## Backdoor
+    ## Backdoor ##
     cfg['attack_mode'] = cfg['backdoor']['attack']
     cfg['num_attackers'] = int(cfg['backdoor']['num_attackers'])
     cfg['poison_percent'] = float(cfg['backdoor']['poison_percent'])
     cfg['poison_ratio'] = cfg['poison_percent'] / (1 - cfg['poison_percent'])
     cfg['target_class'] = int(cfg['backdoor']['target_class'])
+    cfg['poison_data'] = cfg['backdoor']['poison_data']
+    ## Mark ##
     cfg['mark_path'] = cfg['mark']['mark_path']
     cfg['backdoor_test'] = False
-    cfg['mark_width_offset'] = cfg['mark']['width_offset']
+    cfg['mark_width_offset'] = int(cfg['mark']['width_offset'])
+    cfg['YUV'] = cfg['mark']['YUV']
+    cfg['channel_list'] = cfg['mark']['channel_list']
+    cfg['pos_list'] = cfg['mark']['pos_list']
+    cfg['magnitude'] = int(cfg['mark']['magnitude'])
     return
 
 
@@ -643,6 +649,16 @@ def show_image_with_two_labels(image_tensor, true_label, target_label):
     # Show plot
     plt.axis('off')
     plt.show()
+    
+def save_images_to_txt(images, labels, num, path):
+    # images = images * 255
+    for i in range(num):
+        with open(f"{path}/img_{i}.txt", "w") as txt_file:
+            for j in range(images[i].shape[0]):  # Iterate over the slices
+                np.savetxt(txt_file, images[i][j], fmt='%d')
+                txt_file.write("\n")  # Add a newline for separation between slices
+                
+            txt_file.write(f"Label: {labels[i]}\n")
     
 def add_watermark_to_test_dataset(mark, dataset, keep_org):
     fail_count = 0

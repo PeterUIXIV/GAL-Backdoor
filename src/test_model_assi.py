@@ -12,13 +12,13 @@ import torch.backends.cudnn as cudnn
 import torchvision.transforms as T
 import datasets
 from datasets.cifar import CIFAR10
-from marks import Watermark
+from marks.watermark import Watermark
 import models
 from config import cfg
 from data import fetch_dataset, make_data_loader, split_dataset
 from metrics import Metric
 from assist import Assist
-from utils import add_watermark_to_test_dataset, collate, plot_output_preds, plot_output_preds_target, save, load, process_control, process_dataset, resume, show_image_with_two_labels, show_images_with_labels
+from utils import add_watermark_to_test_dataset, collate, plot_output_preds, plot_output_preds_target, poison_dataset, save, load, process_control, process_dataset, resume, show_image_with_two_labels, show_images_with_labels
 from logger import make_logger
 from torchvision import transforms
 
@@ -66,27 +66,29 @@ def runExperiment():
     inputs_test = torch.stack([sample['data'] for sample in dataset['test']], dim=0)
     labels_test = torch.tensor([sample['target'] for sample in dataset['test']])
     
-    data_shape = dataset['test'].data.shape
-    mark = Watermark(data_shape=data_shape, mark_width_offset=cfg['mark_width_offset'])
+    if cfg['attack_mode'] == 'badnet':
+        mark = Watermark(data_shape=cfg['data_shape'], mark_width_offset=cfg['mark_width_offset'])
+        dataset = add_watermark_to_test_dataset(mark=mark, dataset=dataset, keep_org=False)
+    elif cfg['attack_mode'] == 'ftrojan':
+        dataset = poison_dataset(dataset=dataset)
     
     np_images = inputs_test.numpy()
     # show_images_with_labels(np_images, labels_test, 3, 3)
     # images, labels = add_watermark(mark=mark, data=(inputs_test, labels_test))
     # dataset_with_watermark = dataset
-    dataset_with_watermark = add_watermark_to_test_dataset(mark=mark, dataset=dataset, keep_org=False)
     
-    altered_images = torch.stack([sample['data'] for sample in dataset_with_watermark['test']], dim=0)
-    altered_labels = torch.tensor([sample['target'] for sample in dataset_with_watermark['test']])
+    altered_images = torch.stack([sample['data'] for sample in dataset['test']], dim=0)
+    altered_labels = torch.tensor([sample['target'] for sample in dataset['test']])
     np_images = altered_images.numpy()
     # show_images_with_labels(np_images, altered_labels, 3, 3)
     
     # plot_output_preds(np_images, labels_test, output, 3, 3)
     
-    initialize(dataset_with_watermark, assist, organization[0], metric, test_logger, 0)
+    initialize(dataset, assist, organization[0], metric, test_logger, 0)
 
     for epoch in range(1, last_epoch):
         test_logger.safe(True)
-        data_loader = assist.broadcast(dataset_with_watermark, epoch)
+        data_loader = assist.broadcast(dataset, epoch)
         # print(f"data_loader type {type(data_loader)}")
         organization_outputs = gather(data_loader, organization, epoch)
         # for i, output in enumerate(organization_outputs):
@@ -101,9 +103,9 @@ def runExperiment():
             # print(f"targets shape {targets.shape}")
             org_targets = assist.organization_org_target[0]['test']
             # print(f"org_targets shape {org_targets.shape}")
-            test_target = torch.tensor(dataset_with_watermark['test'].target)
+            test_target = torch.tensor(dataset['test'].target)
             # print(f"test_target shape {test_target.shape}")
-            test_data = torch.tensor(dataset_with_watermark['test'].data)
+            test_data = torch.tensor(dataset['test'].data)
             # print(f"test_data shape {test_data.shape}")
             output = assist.organization_output[epoch]['test']
             

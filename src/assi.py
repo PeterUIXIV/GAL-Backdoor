@@ -2,7 +2,6 @@ import copy
 import numpy as np
 import torch
 from mal_org import MalOrg
-from marks import Watermark
 import models
 from config import cfg
 from data import make_data_loader
@@ -47,7 +46,7 @@ class Assi:
             model_name[i] = [model_name[i] for _ in range(cfg['global']['num_epochs'] + 1)]
         return model_name
 
-    def make_organization(self, mark, poison_percent):
+    def make_organization(self):
         feature_split = self.feature_split
         model_name = self.model_name
         organization = [None for _ in range(len(feature_split))]
@@ -59,11 +58,11 @@ class Assi:
                 organization[i] = Organization(i, feature_split_i, model_name_i)
             else:
                 print(f"feature_split_i :{feature_split_i}")
-                organization[i] = MalOrg(organization_id=i, feature_split=feature_split_i, model_name=model_name_i, mark=mark, poison_percent=poison_percent)
+                organization[i] = MalOrg(organization_id=i, feature_split=feature_split_i, model_name=model_name_i)
         return organization
 
     def broadcast(self, dataset, epoch):
-        # print(dataset)
+        print(dataset)
         for split in dataset:
             self.organization_output[epoch - 1][split].requires_grad = True
             loss = models.loss_fn(self.organization_output[epoch - 1][split],
@@ -156,10 +155,10 @@ class Assi:
                              'target': self.organization_target[epoch][split]}
                     input = to_device(input, cfg['device'])
                     self.organization_output[epoch][split] = model(input)['target'].cpu()
-                    if split == 'test':
-                        print(f"_organization_outputs: {_organization_outputs['test'][indices]}, shape {_organization_outputs['test'].shape}")
-                        print(f"self.organization_target {epoch} split {split}: {self.organization_target[epoch][split][indices]}, shape {self.organization_target[epoch][split].shape}")
-                        print(f"self.organization_output {epoch} split {split}: {self.organization_output[epoch][split][indices]}, shape {self.organization_output[epoch][split].shape}")
+                    # if split == 'test':
+                    #     print(f"_organization_outputs: {_organization_outputs['test'][indices]}, shape {_organization_outputs['test'].shape}")
+                    #     print(f"self.organization_target {epoch} split {split}: {self.organization_target[epoch][split][indices]}, shape {self.organization_target[epoch][split].shape}")
+                    #     print(f"self.organization_output {epoch} split {split}: {self.organization_output[epoch][split][indices]}, shape {self.organization_output[epoch][split].shape}")
                         
         else:
             raise ValueError('Not valid assist')

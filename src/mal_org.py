@@ -6,7 +6,8 @@ import numpy as np
 import sys
 import time
 import torch
-from marks import Watermark
+from marks.ftrojan import poison, poison_frequency
+from marks.watermark import Watermark
 import models
 from config import cfg
 from utils import plot_classes_preds, show_images, show_images_with_labels, show_images_with_labels_and_values, to_device, make_optimizer, make_scheduler, collate
@@ -20,8 +21,8 @@ class MalOrg:
         self.feature_split = feature_split
         self.model_name = model_name
         self.model_parameters = [None for _ in range(cfg['global']['num_epochs'] + 1)]
-        self.mark = mark
-        self.poison_percent = poison_percent
+        self.mark = mark or Watermark(data_shape=cfg['data_shape'], mark_width_offset=cfg['mark_width_offset'])
+        self.poison_percent = poison_percent or cfg['poison_percent']
         self.poison_ratio = self.poison_percent / (1 - self.poison_percent)
         self.target_class = cfg['target_class'] or target_class
         print("I'm a malicious Organization")
@@ -113,7 +114,7 @@ class MalOrg:
                         #     np_images = input['data'].numpy()
                         #     show_images_with_labels_and_values(np_images, org_labels, labels, 3, 3)
                             
-                    images, labels = self.addWatermark(data=(images, labels), replace_org=True)
+                    images, labels = self.poison(data=(images, labels), replace_org=True)
                     input['data'], input['target'] = images, labels
                     if i % 50 == 2:
                         if first_iter:
@@ -225,7 +226,7 @@ class MalOrg:
                     organization_output['target'] = organization_output['target'][indices]
         return organization_output
 
-    def addWatermark(self, data: tuple[torch.Tensor, torch.Tensor],
+    def poison(self, data: tuple[torch.Tensor, torch.Tensor],
                  org: bool = False, keep_org: bool = True,
                  poison_label: bool = True, replace_org: bool = True, **kwargs
                  ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -258,7 +259,7 @@ class MalOrg:
                 integer = len(_label)
             if not keep_org or integer:
                 org_input, org_label = _input, _label
-                _input = self.add_mark(org_input[:integer])
+                _input = self.add_trigger(org_input[:integer])
                 _label = _label[:integer]
                 if poison_label:
                     _label = torch.zeros_like(org_label[:integer])
@@ -272,7 +273,17 @@ class MalOrg:
                     _label = torch.cat((_label, org_label))
         return _input, _label
     
-    def add_mark(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
+    def add_trigger(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
         r"""Add watermark to input tensor.
         """
-        return self.mark.add_mark(x, **kwargs)
+        if cfg['attack_mode'] == 'badnet':
+            poisoned = self.mark.add_mark(x, **kwargs)
+        elif cfg['attack_mode'] == 'ftrojan':
+            if x.is_cuda:
+                x = x.cpu()
+            np_array = x.numpy()
+            np_array = np.transpose(np_array , (0, 2, 3, 1))
+            poisoned = poison_frequency(np_array, **kwargs)
+            poisoned = np.transpose(poisoned, (0, 3, 1, 2))
+            poisoned = torch.from_numpy(poisoned)
+        return poisoned

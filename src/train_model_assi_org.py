@@ -3,7 +3,7 @@ import copy
 import datetime
 
 from matplotlib import pyplot as plt
-from marks import Watermark
+from marks.watermark import Watermark
 import json
 from assi import Assi
 import models
@@ -21,7 +21,7 @@ from metrics import Metric
 from utils import add_watermark_to_test_dataset, evaluate_predictions, plot_output_preds, plot_output_preds_target, print_classes_preds, save, load, process_control, process_dataset, resume, show_images_with_labels
 from logger import make_logger
 
-# python train_model_assi_org.py --data_name CIFAR10 --model_name conv --control_name 2_stack_10_10_search_0
+# python train_model_assi_org.py --data_name CIFAR10 --model_name conv --control_name 2_stack_2_2_search_0
 
 cudnn.benchmark = True
 parser = argparse.ArgumentParser(description='cfg')
@@ -66,11 +66,10 @@ def runExperiment():
     assist = Assi(feature_split)
     # assist = Assist(feature_split)
     
-    poison_percent = cfg['poison_percent']
+    
     # Data_shape is only used to create the mark
-    data_shape = dataset['train'].data.shape
-    mark = Watermark(data_shape=data_shape, mark_width_offset=cfg['mark_width_offset'])
-    organization = assist.make_organization(mark, poison_percent)
+    
+    organization = assist.make_organization()
     print(f"Organization id: {organization[0].organization_id}")
     print(f"Organization feature_split size: {organization[0].feature_split.size()}")
     print(f"Organization model_name: {organization[0].model_name}")

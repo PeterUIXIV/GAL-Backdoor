@@ -5,7 +5,8 @@ import pickle
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
-from utils import check_exists, makedir_exist_ok, save, load
+from marks.ftrojan import poison
+from utils import check_exists, makedir_exist_ok, save, load, save_images_to_txt
 from .utils import download_url, extract_file, make_classes_counts, make_tree, make_flat_index
 
 
@@ -14,19 +15,24 @@ class CIFAR10(Dataset):
     file = [('https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz', 'c58f30108f718f92721af3b95e74349a')]
     data_shape = [3, 32, 32]
 
-    def __init__(self, root, split, transform=None):
+    def __init__(self, root, split, transform=None, poison=False):
         self.root = os.path.expanduser(root)
         self.split = split
         self.transform = transform
         if not check_exists(self.processed_folder):
             self.process()
-        id, self.data, self.target = load(os.path.join(self.processed_folder, '{}.pt'.format(self.split)),
-                                          mode='pickle')
+        if not poison:
+            id, self.data, self.target = load(os.path.join(self.processed_folder, '{}.pt'.format(self.split)),
+                                            mode='pickle')
+            self.org_target = np.copy(self.target)
+        elif poison:
+            if not check_exists(self.poisoned_folder):
+                self.poison_dataset()
+            id, self.data, self.target, self.org_target = load(os.path.join(self.poisoned_folder, '{}.pt'.format(self.split)), mode='pickle')
         self.classes_counts = make_classes_counts(self.target)
         self.classes_to_labels, self.target_size = load(os.path.join(self.processed_folder, 'meta.pt'), mode='pickle')
         self.other = {'id': id}
         # self.org_target = [None] * self.__len__()
-        self.org_target = np.copy(self.target)
 
     def __getitem__(self, index):
         data, target = Image.fromarray(self.data[index]), torch.tensor(self.target[index])
@@ -55,6 +61,10 @@ class CIFAR10(Dataset):
     @property
     def raw_folder(self):
         return os.path.join(self.root, 'raw')
+    
+    @property
+    def poisoned_folder(self):
+        return os.path.join(self.root, 'poisoned')
 
     def process(self):
         if not check_exists(self.raw_folder):
@@ -64,6 +74,24 @@ class CIFAR10(Dataset):
         save(test_set, os.path.join(self.processed_folder, 'test.pt'), mode='pickle')
         save(meta, os.path.join(self.processed_folder, 'meta.pt'), mode='pickle')
         return
+    
+    def poison_dataset(self):
+        id_train, x_train, y_train = load(os.path.join(self.processed_folder, '{}.pt'.format('train')),
+                                            mode='pickle')
+        id_test, x_test, y_test = load(os.path.join(self.processed_folder, '{}.pt'.format('test')),
+                                            mode='pickle')
+        makedir_exist_ok(self.poisoned_folder)
+        y_train_org, y_test_org = y_train.copy(), y_test.copy()
+        save_images_to_txt(x_train, y_train, 9, "output/org")        
+        x_train = poison(x_train, y_train)
+        save_images_to_txt(x_train, y_train, 9, "output/frojan")        
+        x_test = poison(x_test, y_test)
+                
+        save((id_train, x_train, y_train, y_train_org), os.path.join(self.poisoned_folder, 'train.pt'), mode='pickle')
+        save((id_test, x_test, y_test, y_test_org), os.path.join(self.poisoned_folder, 'test.pt'), mode='pickle')
+        
+        # classes_to_labels, target_size = load(os.path.join(self.processed_folder, 'meta.pt'), mode='pickle')
+        # save((classes_to_labels, target_size), os.path.join(self.poisoned_folder, 'meta.pt'), mode='pickle')
 
     def download(self):
         makedir_exist_ok(self.raw_folder)
