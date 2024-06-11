@@ -82,11 +82,16 @@ class CIFAR10(Dataset):
                                             mode='pickle')
         makedir_exist_ok(self.poisoned_folder)
         y_train_org, y_test_org = y_train.copy(), y_test.copy()
+        x_train = x_train.astype(np.float32) / 255.
+        x_test = x_test.astype(np.float32) / 255.
         save_images_to_txt(x_train, y_train, 9, "output/org")        
         x_train = poison(x_train, y_train)
-        save_images_to_txt(x_train, y_train, 9, "output/frojan")        
+        save_images_to_txt(x_train, y_train, 9, "output/ftrojan")        
         x_test = poison(x_test, y_test)
-                
+        
+        x_train = (x_train * 255).astype(np.uint8)
+        x_test = (x_test * 255).astype(np.uint8)
+        
         save((id_train, x_train, y_train, y_train_org), os.path.join(self.poisoned_folder, 'train.pt'), mode='pickle')
         save((id_test, x_test, y_test, y_test_org), os.path.join(self.poisoned_folder, 'test.pt'), mode='pickle')
         

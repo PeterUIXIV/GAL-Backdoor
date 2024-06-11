@@ -14,12 +14,9 @@ class Assi:
     def __init__(self, feature_split):
         self.feature_split = feature_split
         self.model_name = self.make_model_name()
-        print(f"Model_name: {self.model_name}")
         self.assist_parameters = [None for _ in range(cfg['global']['num_epochs'] + 1)]
         self.assist_rates = [None for _ in range(cfg['global']['num_epochs'] + 1)]
         self.reset()
-        print(f"self.mal_organization_output: {self.organization_output}")
-        print(f"self.mal_organization_target: {self.organization_target}")
 
     def reset(self):
         self.organization_output = [{split: None for split in cfg['data_size']} for _ in

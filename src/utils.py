@@ -651,7 +651,7 @@ def show_image_with_two_labels(image_tensor, true_label, target_label):
     plt.show()
     
 def save_images_to_txt(images, labels, num, path):
-    # images = images * 255
+    images = images * 255.
     for i in range(num):
         with open(f"{path}/img_{i}.txt", "w") as txt_file:
             for j in range(images[i].shape[0]):  # Iterate over the slices
@@ -704,6 +704,7 @@ def add_watermark(mark: Watermark, data: tuple[torch.Tensor, torch.Tensor],
             _label = _label.unsqueeze(0)
         if not org:
             if keep_org:
+                # decimal, integer = math.modf(len(_label) * cfg['poison_percent'])                    
                 decimal, integer = math.modf(len(_label) * cfg['poison_ratio'])                    
                 integer = int(integer)
                 if random.uniform(0, 1) < decimal:

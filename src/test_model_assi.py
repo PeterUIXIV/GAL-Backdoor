@@ -1,10 +1,5 @@
 import argparse
-import copy
-import datetime
-import math
 import os
-import random
-import sys
 from matplotlib import pyplot as plt
 import numpy as np
 import torch
@@ -17,10 +12,8 @@ import models
 from config import cfg
 from data import fetch_dataset, make_data_loader, split_dataset
 from metrics import Metric
-from assist import Assist
 from utils import add_watermark_to_test_dataset, collate, plot_output_preds, plot_output_preds_target, poison_dataset, save, load, process_control, process_dataset, resume, show_image_with_two_labels, show_images_with_labels
 from logger import make_logger
-from torchvision import transforms
 
 cudnn.benchmark = True
 parser = argparse.ArgumentParser(description='cfg')

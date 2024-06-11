@@ -29,7 +29,7 @@ backdoor:
   attack: 'ftrojan'
   # attack: 'badnet'
   num_attackers: 1
-  poison_percent: 0.5
+  poison_percent: 0.05
   target_class: 1
   poison_data: False
 mark:

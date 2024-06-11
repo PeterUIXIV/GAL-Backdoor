@@ -26,7 +26,7 @@ class MalOrg:
         self.poison_ratio = self.poison_percent / (1 - self.poison_percent)
         self.target_class = cfg['target_class'] or target_class
         print("I'm a malicious Organization")
-        print(f"with poison ratio: {self.poison_ratio} and target class {self.target_class}")
+        # print(f"with poison ratio: {self.poison_ratio} and target class {self.target_class}")
 
     # Only main org is initialized!
     def initialize(self, dataset, metric, logger):
@@ -86,10 +86,10 @@ class MalOrg:
             print(logger.write('train', metric.metric_name['train']), end='\r', flush=True)
             self.model_parameters[epoch] = model
         else:
-            print("Data_loader.dataset.data shape")
-            print(data_loader.dataset.data.shape)
-            print("data_loader.dataset.target shape")
-            print(data_loader.dataset.target.shape)
+            # print("Data_loader.dataset.data shape")
+            # print(data_loader.dataset.data.shape)
+            # print("data_loader.dataset.target shape")
+            # print(data_loader.dataset.target.shape)
             first_iter = True
             model = eval('models.{}().to(cfg["device"])'.format(self.model_name[epoch]))
             if 'dl' in cfg and ['dl'] == '1' and epoch > 1:
@@ -251,6 +251,7 @@ class MalOrg:
         # _label size torch.Size([512, 10]) _label len 512
         if not org:
             if keep_org:
+                # decimal, integer = math.modf(len(_label) * self.poison_percent)
                 decimal, integer = math.modf(len(_label) * self.poison_ratio)
                 integer = int(integer)
                 if random.uniform(0, 1) < decimal:
