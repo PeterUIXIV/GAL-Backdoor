@@ -21,7 +21,7 @@ from metrics import Metric
 from utils import add_watermark_to_test_dataset, evaluate_predictions, plot_output_preds, plot_output_preds_target, print_classes_preds, save, load, process_control, process_dataset, resume, show_images_with_labels
 from logger import make_logger
 
-# python train_model_assi_org.py --data_name CIFAR10 --model_name conv --control_name 2_stack_2_2_search_0
+# python train_model_assi_org.py --control_name 2_stack_2_2_search_0
 
 cudnn.benchmark = True
 parser = argparse.ArgumentParser(description='cfg')

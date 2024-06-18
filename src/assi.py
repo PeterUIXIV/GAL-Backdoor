@@ -1,5 +1,6 @@
 import copy
 import numpy as np
+from sklearn.ensemble import IsolationForest
 import torch
 from mal_org import MalOrg
 import models
@@ -59,7 +60,7 @@ class Assi:
         return organization
 
     def broadcast(self, dataset, epoch):
-        print(dataset)
+        # print(dataset)
         for split in dataset:
             self.organization_output[epoch - 1][split].requires_grad = True
             loss = models.loss_fn(self.organization_output[epoch - 1][split],
@@ -126,7 +127,6 @@ class Assi:
                 for i in range(len(organization_outputs)):
                     _organization_outputs[split].append(organization_outputs[i][split])
                 _organization_outputs[split] = torch.stack(_organization_outputs[split], dim=-1)
-            print(f"_organization_outputs test split shape {_organization_outputs['test'].shape}")
             if 'train' in organization_outputs[0]:
                 input = {'output': _organization_outputs['train'],
                          'target': self.organization_target[epoch]['train']}
@@ -146,19 +146,62 @@ class Assi:
                 model.load_state_dict(self.assist_parameters[epoch])
                 print(f"self.assist_parameters epoch {epoch}: {self.assist_parameters[epoch]}")
                 model.train(False)
-                indices = [0, 1, 2]
                 for split in organization_outputs[0]:
                     input = {'output': _organization_outputs[split],
                              'target': self.organization_target[epoch][split]}
                     input = to_device(input, cfg['device'])
-                    self.organization_output[epoch][split] = model(input)['target'].cpu()
-                    # if split == 'test':
-                    #     print(f"_organization_outputs: {_organization_outputs['test'][indices]}, shape {_organization_outputs['test'].shape}")
-                    #     print(f"self.organization_target {epoch} split {split}: {self.organization_target[epoch][split][indices]}, shape {self.organization_target[epoch][split].shape}")
-                    #     print(f"self.organization_output {epoch} split {split}: {self.organization_output[epoch][split][indices]}, shape {self.organization_output[epoch][split].shape}")
-                        
+                    self.organization_output[epoch][split] = model(input)['target'].cpu()                                            
         else:
-            raise ValueError('Not valid assist')
+            raise ValueError('Not valid assist mode')
+        if cfg['detect_anomalies'] == True:
+            if cfg['test']['shuffle'] is not False:
+                raise ValueError('Detect anomalies only with test shuffle False possible')
+            # _organization_outputs = {split: [] for split in organization_outputs[0]}
+            # for split in organization_outputs[0]:
+            #     for i in range(len(organization_outputs)):
+            #         _organization_outputs[split].append(organization_outputs[i][split])
+            # _organization_outputs[split] = torch.stack(_organization_outputs[split], dim=-1)
+            
+            aggregated_train_data = []
+            aggregated_test_data = []
+
+            # Iterate over each participant's data
+            for participant_data in organization_outputs:
+                train_data = participant_data['train']
+                test_data = participant_data['test']
+                
+                # Append flattened data to the respective lists
+                aggregated_train_data.append(train_data)
+                aggregated_test_data.append(test_data)
+
+            # Stack the data from all participants along a new dimension (dimension 2)
+            aggregated_train_tensor = torch.stack(aggregated_train_data, dim=2)  # Shape: [50000, 10, num_participants]
+            aggregated_test_tensor = torch.stack(aggregated_test_data, dim=2)    # Shape: [10000, 10, num_participants]
+
+            # Reshape the data to have samples as rows and features as columns
+            num_train_samples, num_classes, num_participants = aggregated_train_tensor.shape
+            num_test_samples = aggregated_test_tensor.shape[0]
+
+            # Flatten the tensors to shape [num_samples, num_classes * num_participants]
+            flattened_train_tensor = aggregated_train_tensor.view(num_train_samples, num_classes * num_participants)
+            flattened_test_tensor = aggregated_test_tensor.view(num_test_samples, num_classes * num_participants)
+
+            if cfg['detect_mode'] == 'isolation_forest':
+                X_train = flattened_train_tensor.numpy()
+                X_test = flattened_test_tensor.numpy()
+                
+                iso_forest = IsolationForest(contamination='auto', random_state=42)
+                iso_forest.fit(X_train)
+                
+                # Predict anomalies on the test data
+                test_anomalies = iso_forest.predict(X_test)
+                test_malicious_predictions = test_anomalies == -1
+
+                # Identify the indices of malicious samples in the test data
+                test_malicious_indices = np.where(test_malicious_predictions)[0]
+                print("## Malicious indices in test data ##")
+                print(test_malicious_indices)
+        
         if 'train' in organization_outputs[0]:
             if cfg['assist_rate_mode'] == 'search':
                 input = {'history': self.organization_output[epoch - 1]['train'],

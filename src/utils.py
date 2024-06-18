@@ -264,6 +264,9 @@ def process_control():
     cfg['channel_list'] = cfg['mark']['channel_list']
     cfg['pos_list'] = cfg['mark']['pos_list']
     cfg['magnitude'] = int(cfg['mark']['magnitude'])
+    ## Defense ##
+    cfg['detect_anomalies'] = cfg['defense']['detect_anomalies']
+    cfg['detect_mode'] = cfg['defense']['mode']
     return
 
 

@@ -25,8 +25,7 @@ class MalOrg:
         self.poison_percent = poison_percent or cfg['poison_percent']
         self.poison_ratio = self.poison_percent / (1 - self.poison_percent)
         self.target_class = cfg['target_class'] or target_class
-        print("I'm a malicious Organization")
-        # print(f"with poison ratio: {self.poison_ratio} and target class {self.target_class}")
+        self.manipulated_ids = []
 
     # Only main org is initialized!
     def initialize(self, dataset, metric, logger):
@@ -86,10 +85,6 @@ class MalOrg:
             print(logger.write('train', metric.metric_name['train']), end='\r', flush=True)
             self.model_parameters[epoch] = model
         else:
-            # print("Data_loader.dataset.data shape")
-            # print(data_loader.dataset.data.shape)
-            # print("data_loader.dataset.target shape")
-            # print(data_loader.dataset.target.shape)
             first_iter = True
             model = eval('models.{}().to(cfg["device"])'.format(self.model_name[epoch]))
             if 'dl' in cfg and ['dl'] == '1' and epoch > 1:
@@ -114,7 +109,7 @@ class MalOrg:
                         #     np_images = input['data'].numpy()
                         #     show_images_with_labels_and_values(np_images, org_labels, labels, 3, 3)
                             
-                    images, labels = self.poison(data=(images, labels), replace_org=True)
+                    images, labels = self.poison(id=None, data=(images, labels), replace_org=True)
                     input['data'], input['target'] = images, labels
                     if i % 50 == 2:
                         if first_iter:
@@ -192,6 +187,9 @@ class MalOrg:
                 organization_output = {'id': [], 'target': []}
                 for i, input in enumerate(data_loader):
                     input = collate(input)
+                    id, images, labels = input['id'], input['data'], input['target']                            
+                    images, labels = self.poison(id=id, data=(images, labels), replace_org=True)
+                    input['data'], input['target'] = images, labels
                     input['feature_split'] = self.feature_split
                     if cfg['noise'] == 'data' and self.organization_id in cfg['noised_organization_id']:
                         input['data'] = torch.randn(input['data'].size())
@@ -226,7 +224,7 @@ class MalOrg:
                     organization_output['target'] = organization_output['target'][indices]
         return organization_output
 
-    def poison(self, data: tuple[torch.Tensor, torch.Tensor],
+    def poison(self, id, data: tuple[torch.Tensor, torch.Tensor],
                  org: bool = False, keep_org: bool = True,
                  poison_label: bool = True, replace_org: bool = True, **kwargs
                  ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -266,6 +264,8 @@ class MalOrg:
                     _label = torch.zeros_like(org_label[:integer])
                     _label[:integer, self.target_class] = 1
                     # _label = self.target_class * torch.ones_like(org_label[:integer])
+                if id is not None:
+                    self.manipulated_ids.extend(id[:integer].tolist())
                 if replace_org:
                     _input = torch.cat((_input, org_input[integer:]))
                     _label = torch.cat((_label, org_label[integer:]))

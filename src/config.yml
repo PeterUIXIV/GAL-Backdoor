@@ -26,10 +26,10 @@ world_size: 1
 resume_mode: 0
 # backdoor
 backdoor:
-  attack: 'ftrojan'
-  # attack: 'badnet'
+  # attack: 'ftrojan'
+  attack: 'badnet'
   num_attackers: 1
-  poison_percent: 0.05
+  poison_percent: 0.04
   target_class: 1
   poison_data: False
 mark:
@@ -43,3 +43,6 @@ mark:
   - [31, 31]
   - [15, 15]
   magnitude: 30
+defense:
+  detect_anomalies: True
+  mode: 'isolation_forest'

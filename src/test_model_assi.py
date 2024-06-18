@@ -6,13 +6,11 @@ import torch
 import torch.backends.cudnn as cudnn
 import torchvision.transforms as T
 import datasets
-from datasets.cifar import CIFAR10
-from marks.watermark import Watermark
 import models
 from config import cfg
-from data import fetch_dataset, make_data_loader, split_dataset
+from data import fetch_dataset
 from metrics import Metric
-from utils import add_watermark_to_test_dataset, collate, plot_output_preds, plot_output_preds_target, poison_dataset, save, load, process_control, process_dataset, resume, show_image_with_two_labels, show_images_with_labels
+from utils import plot_output_preds_target, save, process_control, process_dataset, resume, show_images_with_labels
 from logger import make_logger
 
 cudnn.benchmark = True
@@ -59,11 +57,11 @@ def runExperiment():
     inputs_test = torch.stack([sample['data'] for sample in dataset['test']], dim=0)
     labels_test = torch.tensor([sample['target'] for sample in dataset['test']])
     
-    if cfg['attack_mode'] == 'badnet':
-        mark = Watermark(data_shape=cfg['data_shape'], mark_width_offset=cfg['mark_width_offset'])
-        dataset = add_watermark_to_test_dataset(mark=mark, dataset=dataset, keep_org=False)
-    elif cfg['attack_mode'] == 'ftrojan':
-        dataset = poison_dataset(dataset=dataset)
+    # if cfg['attack_mode'] == 'badnet':
+    #     mark = Watermark(data_shape=cfg['data_shape'], mark_width_offset=cfg['mark_width_offset'])
+    #     dataset = add_watermark_to_test_dataset(mark=mark, dataset=dataset, keep_org=False)
+    # elif cfg['attack_mode'] == 'ftrojan':
+    #     dataset = poison_dataset(dataset=dataset)
     
     np_images = inputs_test.numpy()
     # show_images_with_labels(np_images, labels_test, 3, 3)
