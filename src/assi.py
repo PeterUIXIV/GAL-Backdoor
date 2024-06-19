@@ -1,6 +1,7 @@
 import copy
 import numpy as np
 from sklearn.ensemble import IsolationForest
+from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
 import torch
 from mal_org import MalOrg
 import models
@@ -109,7 +110,7 @@ class Assi:
             data_loader[i] = make_data_loader(dataset, self.model_name[i][epoch])
         return data_loader
 
-    def update(self, organization_outputs, epoch):
+    def update(self, organization_outputs, actual_malicious_indices, epoch):
         if cfg['assist_mode'] == 'none':
             for split in organization_outputs[0]:
                 self.organization_output[epoch][split] = organization_outputs[0][split]
@@ -154,7 +155,7 @@ class Assi:
         else:
             raise ValueError('Not valid assist mode')
         if cfg['detect_anomalies'] == True:
-            if cfg['test']['shuffle'] is not False:
+            if cfg[cfg['model_name']]['shuffle']['test']:
                 raise ValueError('Detect anomalies only with test shuffle False possible')
             # _organization_outputs = {split: [] for split in organization_outputs[0]}
             # for split in organization_outputs[0]:
@@ -162,36 +163,23 @@ class Assi:
             #         _organization_outputs[split].append(organization_outputs[i][split])
             # _organization_outputs[split] = torch.stack(_organization_outputs[split], dim=-1)
             
-            aggregated_train_data = []
-            aggregated_test_data = []
+            train_tensors = [org['train'] for org in organization_outputs]
+            test_tensors = [org['test'] for org in organization_outputs]
 
-            # Iterate over each participant's data
-            for participant_data in organization_outputs:
-                train_data = participant_data['train']
-                test_data = participant_data['test']
-                
-                # Append flattened data to the respective lists
-                aggregated_train_data.append(train_data)
-                aggregated_test_data.append(test_data)
-
-            # Stack the data from all participants along a new dimension (dimension 2)
-            aggregated_train_tensor = torch.stack(aggregated_train_data, dim=2)  # Shape: [50000, 10, num_participants]
-            aggregated_test_tensor = torch.stack(aggregated_test_data, dim=2)    # Shape: [10000, 10, num_participants]
+            # Concatenate train tensors and test tensors
+            concatenated_train_tensor = torch.cat(train_tensors, dim=0)
+            concatenated_test_tensor = torch.cat(test_tensors, dim=0)
 
             # Reshape the data to have samples as rows and features as columns
-            num_train_samples, num_classes, num_participants = aggregated_train_tensor.shape
-            num_test_samples = aggregated_test_tensor.shape[0]
-
-            # Flatten the tensors to shape [num_samples, num_classes * num_participants]
-            flattened_train_tensor = aggregated_train_tensor.view(num_train_samples, num_classes * num_participants)
-            flattened_test_tensor = aggregated_test_tensor.view(num_test_samples, num_classes * num_participants)
+            num_train_samples, num_classes = organization_outputs[0]['train'].shape
+            num_test_samples, num_classes = organization_outputs[0]['test'].shape
 
             if cfg['detect_mode'] == 'isolation_forest':
-                X_train = flattened_train_tensor.numpy()
-                X_test = flattened_test_tensor.numpy()
+                X_train = concatenated_train_tensor.numpy()
+                X_test = concatenated_test_tensor.numpy()
                 
                 iso_forest = IsolationForest(contamination='auto', random_state=42)
-                iso_forest.fit(X_train)
+                iso_forest.fit(X_test)
                 
                 # Predict anomalies on the test data
                 test_anomalies = iso_forest.predict(X_test)
@@ -199,8 +187,36 @@ class Assi:
 
                 # Identify the indices of malicious samples in the test data
                 test_malicious_indices = np.where(test_malicious_predictions)[0]
-                print("## Malicious indices in test data ##")
-                print(test_malicious_indices)
+            
+            predicted_malicous_indices = {}
+            for value in test_malicious_indices:
+                key = value // num_test_samples  # Determine the key based on the value
+                if key not in predicted_malicous_indices:
+                    predicted_malicous_indices[key] = []  # Initialize the list for this key if not present
+                predicted_malicous_indices[key].append(value - (key * num_test_samples))  # Append the value to the appropriate list
+            
+            for i in range(len(organization_outputs)):            
+                predicted_set = set(predicted_malicous_indices[i])
+                actual_set = set(actual_malicious_indices[i]['test'])
+                
+                all_indices = sorted(list(predicted_set.union(actual_set)))
+                y_true = [1 if idx in actual_set else 0 for idx in all_indices]
+                y_pred = [1 if idx in predicted_set else 0 for idx in all_indices]
+
+                # Calculate precision, recall, F1-score
+                precision = precision_score(y_true, y_pred, zero_division=0.0)
+                recall = recall_score(y_true, y_pred, zero_division=0.0)  # Sensitivity is the same as recall
+                f1 = f1_score(y_true, y_pred)
+
+                # Calculate specificity
+                tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+                specificity = tn / (tn + fp)
+
+                # Print the results
+                print(f"Precision: {precision}")
+                print(f"Recall (Sensitivity): {recall}")
+                print(f"F1-Score: {f1}")
+                print(f"Specificity: {specificity}")
         
         if 'train' in organization_outputs[0]:
             if cfg['assist_rate_mode'] == 'search':

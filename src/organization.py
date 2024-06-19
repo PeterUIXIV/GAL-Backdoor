@@ -16,6 +16,7 @@ class Organization:
         self.feature_split = feature_split
         self.model_name = model_name
         self.model_parameters = [None for _ in range(cfg['global']['num_epochs'] + 1)]
+        self.manipulated_ids = []
 
     def initialize(self, dataset, metric, logger):
         input, output, initialization = {}, {}, {}
@@ -138,6 +139,7 @@ class Organization:
             organization_output['id'], indices = torch.sort(organization_output['id'])
             organization_output['target'] = organization_output['target'][indices]
         else:
+            self.manipulated_ids = []
             with torch.no_grad():
                 model = eval('models.{}().to(cfg["device"])'.format(self.model_name[iter]))
                 if 'dl' in cfg and cfg['dl'] == '1' and iter > 1:

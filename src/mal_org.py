@@ -1,16 +1,15 @@
 import datetime
 import math
 import random
-from matplotlib import pyplot as plt
 import numpy as np
 import sys
 import time
 import torch
-from marks.ftrojan import poison, poison_frequency
+from marks.ftrojan import poison_frequency
 from marks.watermark import Watermark
 import models
 from config import cfg
-from utils import plot_classes_preds, show_images, show_images_with_labels, show_images_with_labels_and_values, to_device, make_optimizer, make_scheduler, collate
+from utils import to_device, make_optimizer, make_scheduler, collate
 
 classes = ('plane', 'car', 'bird', 'cat',
            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
@@ -22,7 +21,7 @@ class MalOrg:
         self.model_name = model_name
         self.model_parameters = [None for _ in range(cfg['global']['num_epochs'] + 1)]
         self.mark = mark or Watermark(data_shape=cfg['data_shape'], mark_width_offset=cfg['mark_width_offset'])
-        self.poison_percent = poison_percent or cfg['poison_percent']
+        self.poison_percent = cfg['poison_percent'] or poison_percent
         self.poison_ratio = self.poison_percent / (1 - self.poison_percent)
         self.target_class = cfg['target_class'] or target_class
         self.manipulated_ids = []
@@ -174,6 +173,7 @@ class MalOrg:
             organization_output['id'], indices = torch.sort(organization_output['id'])
             organization_output['target'] = organization_output['target'][indices]
         else:
+            self.manipulated_ids = []
             with torch.no_grad():
                 model = eval('models.{}().to(cfg["device"])'.format(self.model_name[iteration]))
                 if 'dl' in cfg and cfg['dl'] == '1' and iteration > 1:

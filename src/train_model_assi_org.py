@@ -121,8 +121,8 @@ def runExperiment():
         logger.safe(True)
         data_loader = assist.broadcast(dataset, epoch)
         train(data_loader, organization, metric, logger, epoch)
-        organization_outputs = gather(data_loader, organization, epoch)
-        assist.update(organization_outputs, epoch)
+        organization_outputs, manipulated_ids = gather(data_loader, organization, epoch)
+        assist.update(organization_outputs, manipulated_ids, epoch)
         test(assist, metric, logger, epoch)
         logger.safe(False)
         save_result = {'cfg': cfg, 'epoch': epoch + 1, 'assist': assist, 'organization': organization, 'logger': logger}
@@ -203,10 +203,12 @@ def gather(data_loader, organization, epoch):
     with torch.no_grad():
         num_organizations = len(organization)
         organization_outputs = [{split: None for split in data_loader[i]} for i in range(num_organizations)]
+        manipulated_ids = [{split: None for split in data_loader[i]} for i in range(num_organizations)]
         for i in range(num_organizations):
             for split in organization_outputs[i]:
                 organization_outputs[i][split] = organization[i].predict(epoch, data_loader[i][split])['target']
-    return organization_outputs
+                manipulated_ids[i][split] = organization[i].manipulated_ids
+    return organization_outputs, manipulated_ids
 
 
 def test(assist, metric, logger, epoch):
