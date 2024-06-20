@@ -29,7 +29,7 @@ backdoor:
   # attack: 'ftrojan'
   attack: 'badnet'
   num_attackers: 1
-  poison_percent: 0.04
+  poison_percent: 0.03
   target_class: 1
   poison_data: False
 mark:
@@ -45,4 +45,5 @@ mark:
   magnitude: 30
 defense:
   detect_anomalies: True
+  # mode: 'svm'
   mode: 'isolation_forest'

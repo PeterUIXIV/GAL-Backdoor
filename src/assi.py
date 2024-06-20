@@ -1,8 +1,11 @@
 import copy
 import numpy as np
 from sklearn.ensemble import IsolationForest
-from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
+from sklearn.metrics import confusion_matrix, f1_score, make_scorer, precision_score, recall_score
+from sklearn.model_selection import GridSearchCV
+from sklearn.svm import OneClassSVM
 import torch
+from anomaly import precision_scorer, recall_scorer
 from mal_org import MalOrg
 import models
 from config import cfg
@@ -157,66 +160,98 @@ class Assi:
         if cfg['detect_anomalies'] == True:
             if cfg[cfg['model_name']]['shuffle']['test']:
                 raise ValueError('Detect anomalies only with test shuffle False possible')
-            # _organization_outputs = {split: [] for split in organization_outputs[0]}
-            # for split in organization_outputs[0]:
-            #     for i in range(len(organization_outputs)):
-            #         _organization_outputs[split].append(organization_outputs[i][split])
-            # _organization_outputs[split] = torch.stack(_organization_outputs[split], dim=-1)
             
             train_tensors = [org['train'] for org in organization_outputs]
             test_tensors = [org['test'] for org in organization_outputs]
 
             # Concatenate train tensors and test tensors
-            concatenated_train_tensor = torch.cat(train_tensors, dim=0)
-            concatenated_test_tensor = torch.cat(test_tensors, dim=0)
+            concatenated_train_tensor = torch.cat(train_tensors, dim=0) # [100 000, 10]
+            concatenated_test_tensor = torch.cat(test_tensors, dim=0) # [20 000, 10]
 
             # Reshape the data to have samples as rows and features as columns
             num_train_samples, num_classes = organization_outputs[0]['train'].shape
             num_test_samples, num_classes = organization_outputs[0]['test'].shape
+            num_orgs = len(organization_outputs)
 
+            X_train = concatenated_train_tensor.numpy()
+            X_test = concatenated_test_tensor.numpy()
+            
             if cfg['detect_mode'] == 'isolation_forest':
-                X_train = concatenated_train_tensor.numpy()
-                X_test = concatenated_test_tensor.numpy()
                 
                 iso_forest = IsolationForest(contamination='auto', random_state=42)
-                iso_forest.fit(X_test)
+                iso_forest.fit(X_train)
                 
                 # Predict anomalies on the test data
-                test_anomalies = iso_forest.predict(X_test)
-                test_malicious_predictions = test_anomalies == -1
-
-                # Identify the indices of malicious samples in the test data
-                test_malicious_indices = np.where(test_malicious_predictions)[0]
-            
-            predicted_malicous_indices = {}
-            for value in test_malicious_indices:
-                key = value // num_test_samples  # Determine the key based on the value
-                if key not in predicted_malicous_indices:
-                    predicted_malicous_indices[key] = []  # Initialize the list for this key if not present
-                predicted_malicous_indices[key].append(value - (key * num_test_samples))  # Append the value to the appropriate list
-            
-            for i in range(len(organization_outputs)):            
-                predicted_set = set(predicted_malicous_indices[i])
-                actual_set = set(actual_malicious_indices[i]['test'])
+                anomalies = iso_forest.predict(X_test)
                 
-                all_indices = sorted(list(predicted_set.union(actual_set)))
-                y_true = [1 if idx in actual_set else 0 for idx in all_indices]
-                y_pred = [1 if idx in predicted_set else 0 for idx in all_indices]
-
-                # Calculate precision, recall, F1-score
-                precision = precision_score(y_true, y_pred, zero_division=0.0)
-                recall = recall_score(y_true, y_pred, zero_division=0.0)  # Sensitivity is the same as recall
-                f1 = f1_score(y_true, y_pred)
-
-                # Calculate specificity
-                tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
-                specificity = tn / (tn + fp)
-
-                # Print the results
+            elif cfg['detect_mode'] == 'svm':
+                param_grid = {
+                    'nu': [0.01, 0.05, 0.1, 0.2],
+                    'gamma': ['scale', 'auto', 0.01, 0.1, 1]
+                }
+                ocsvm = OneClassSVM(nu=0.1, kernel="rbf", gamma=0.1)
+                ocsvm.fit(X_train)
+                # scoring = {"Precision": make_scorer(precision_scorer), "Recall": make_scorer(recall_scorer)}
+                # grid_search = GridSearchCV(ocsvm, param_grid, cv=5, scoring=scoring, n_jobs=-1)
+                # grid_search.fit(X_train)
+                
+                # best_params = grid_search.best_params_
+                # print(f"Best parameters: {best_params}")
+                
+                # best_ocsvm = OneClassSVM(nu=best_params['nu'], gamma=best_params['gamma'], kernel='rbf')
+                # best_ocsvm.fit(X_train)
+                anomalies = ocsvm.predict(X_test) # [20000,] values 1 for benign, -1 for anomaly
+                
+            ## new
+            # anomalies = np.copy(test_anomalies)
+            anomalies[anomalies == 1] = 0
+            anomalies[anomalies == -1] = 1
+            anomalies_by_org = np.array_split(anomalies, num_orgs)
+            
+            for i in range(num_orgs):
+                actuals = np.zeros(num_test_samples, dtype=int)
+                actuals[actual_malicious_indices[i]['test']] = 1
+                precision = precision_score(actuals, anomalies_by_org[i], zero_division=0.0)
+                recall = recall_score(actuals, anomalies_by_org[i], zero_division=0.0) # Sensitivity is the same as recall
+                f1 = f1_score(actuals, anomalies_by_org[i], zero_division=0.0)
+                print(f"## Anomaly detection results org {i} ##")
                 print(f"Precision: {precision}")
                 print(f"Recall (Sensitivity): {recall}")
                 print(f"F1-Score: {f1}")
-                print(f"Specificity: {specificity}")
+            
+            # test_malicious_predictions = test_anomalies == -1
+            
+            # # Identify the indices of malicious samples in the test data
+            # test_malicious_indices = np.where(test_malicious_predictions)[0]
+                
+            # predicted_malicous_indices = {i: [] for i in range(len(organization_outputs))}
+            # for value in test_malicious_indices:
+            #     key = value // num_test_samples  # Determine the key based on the value
+            #     predicted_malicous_indices[key].append(value - (key * num_test_samples))  # Append the value to the appropriate list
+            
+            # for i in range(len(organization_outputs)):            
+            #     predicted_set = set(predicted_malicous_indices[i])
+            #     actual_set = set(actual_malicious_indices[i]['test'])
+                
+            #     all_indices = sorted(list(predicted_set.union(actual_set)))
+            #     y_true = [1 if idx in actual_set else 0 for idx in all_indices]
+            #     y_pred = [1 if idx in predicted_set else 0 for idx in all_indices]
+
+            #     # Calculate precision, recall, F1-score
+            #     precision = precision_score(y_true, y_pred, zero_division=0.0)
+            #     recall = recall_score(y_true, y_pred, zero_division=0.0)  # Sensitivity is the same as recall
+            #     f1 = f1_score(y_true, y_pred)
+
+            #     # Calculate specificity
+            #     tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+            #     specificity = tn / (tn + fp)
+
+            #     # Print the results
+            #     print(f"## Anomaly detection results org {i} ##")
+            #     print(f"Precision: {precision}")
+            #     print(f"Recall (Sensitivity): {recall}")
+            #     print(f"F1-Score: {f1}")
+            #     print(f"Specificity: {specificity}")
         
         if 'train' in organization_outputs[0]:
             if cfg['assist_rate_mode'] == 'search':
