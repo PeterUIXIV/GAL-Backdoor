@@ -48,7 +48,7 @@ class Assi:
             model_name[i] = [model_name[i] for _ in range(cfg['global']['num_epochs'] + 1)]
         return model_name
 
-    def make_organization(self):
+    def make_organization(self, poison_agent=None):
         feature_split = self.feature_split
         model_name = self.model_name
         organization = [None for _ in range(len(feature_split))]
@@ -60,7 +60,7 @@ class Assi:
                 organization[i] = Organization(i, feature_split_i, model_name_i)
             else:
                 print(f"feature_split_i :{feature_split_i}")
-                organization[i] = MalOrg(organization_id=i, feature_split=feature_split_i, model_name=model_name_i)
+                organization[i] = MalOrg(organization_id=i, feature_split=feature_split_i, model_name=model_name_i, poison_agent=poison_agent)
         return organization
 
     def broadcast(self, dataset, epoch):
@@ -185,10 +185,10 @@ class Assi:
                 anomalies = iso_forest.predict(X_test)
                 
             elif cfg['detect_mode'] == 'svm':
-                param_grid = {
-                    'nu': [0.01, 0.05, 0.1, 0.2],
-                    'gamma': ['scale', 'auto', 0.01, 0.1, 1]
-                }
+                # param_grid = {
+                #     'nu': [0.01, 0.05, 0.1, 0.2],
+                #     'gamma': ['scale', 'auto', 0.01, 0.1, 1]
+                # }
                 ocsvm = OneClassSVM(nu=0.1, kernel="rbf", gamma=0.1)
                 ocsvm.fit(X_train)
                 # scoring = {"Precision": make_scorer(precision_scorer), "Recall": make_scorer(recall_scorer)}
@@ -207,7 +207,7 @@ class Assi:
             anomalies[anomalies == 1] = 0
             anomalies[anomalies == -1] = 1
             anomalies_by_org = np.array_split(anomalies, num_orgs)
-            
+            # TODO: if is malorg sonst keine malicous prediction
             for i in range(num_orgs):
                 actuals = np.zeros(num_test_samples, dtype=int)
                 actuals[actual_malicious_indices[i]['test']] = 1

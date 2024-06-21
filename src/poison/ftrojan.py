@@ -1,7 +1,6 @@
 import numpy as np
 from config import cfg
-
-from marks.image import DCT, IDCT, RGB2YUV, YUV2RGB
+from poison.image import DCT, IDCT, RGB2YUV, YUV2RGB
 
 
 def poison(x_train, y_train):
@@ -13,7 +12,7 @@ def poison(x_train, y_train):
     index = index[:num_images]
     x_train[index] = poison_frequency(x_train[index])
     y_train[index] = target_label
-    return x_train
+    return x_train, y_train, index
 
 
 def poison_frequency(x_train):

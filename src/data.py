@@ -15,17 +15,11 @@ def fetch_dataset(data_name, verbose=True):
     if data_name in ['Blob', 'Iris', 'Diabetes', 'BostonHousing', 'Wine', 'BreastCancer', 'QSAR']:
         dataset['train'] = eval('datasets.{}(root=root, split=\'train\')'.format(data_name))
         dataset['test'] = eval('datasets.{}(root=root, split=\'test\')'.format(data_name))
-    elif data_name in ['MNIST', 'CIFAR10']:
-        if cfg['poison_data'] == True:
-            dataset['train'] = eval('datasets.{}(root=root, split=\'train\', '
-                                    'transform=datasets.Compose([transforms.ToTensor()]), poison=True)'.format(data_name))
-            dataset['test'] = eval('datasets.{}(root=root, split=\'test\', '
-                               'transform=datasets.Compose([transforms.ToTensor()]), poison=True)'.format(data_name))
-        else:    
-            dataset['train'] = eval('datasets.{}(root=root, split=\'train\', '
-                                    'transform=datasets.Compose([transforms.ToTensor()]))'.format(data_name))
-            dataset['test'] = eval('datasets.{}(root=root, split=\'test\', '
-                               'transform=datasets.Compose([transforms.ToTensor()]))'.format(data_name))
+    elif data_name in ['MNIST', 'CIFAR10']:        
+        dataset['train'] = eval('datasets.{}(root=root, split=\'train\', '
+                                'transform=datasets.Compose([transforms.ToTensor()]))'.format(data_name))
+        dataset['test'] = eval('datasets.{}(root=root, split=\'test\', '
+                            'transform=datasets.Compose([transforms.ToTensor()]))'.format(data_name))
     elif data_name in ['ModelNet40', 'ShapeNet55']:
         dataset['train'] = eval('datasets.{}(root=root, split=\'train\', '
                                 'transform=datasets.Compose([transforms.ToTensor()]))'.format(data_name))

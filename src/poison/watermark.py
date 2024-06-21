@@ -46,7 +46,7 @@ def update_mark_alpha_channel(
     return mark
 
 class Watermark():
-    def __init__(self, mark_path: str = 'apple_black.png',
+    def __init__(self, mark_path: str = 'square_white.png',
                  data_shape: list[int] = None, 
                  mark_background_color: str | torch.Tensor = 'auto',
                  mark_alpha: float = 1.0, 

@@ -1,30 +1,23 @@
 import datetime
-import math
-import random
 import numpy as np
 import sys
 import time
 import torch
-from marks.ftrojan import poison_frequency
-from marks.watermark import Watermark
 import models
 from config import cfg
+from poison.poison_agent import PoisonAgent
 from utils import to_device, make_optimizer, make_scheduler, collate
 
 classes = ('plane', 'car', 'bird', 'cat',
            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
 class MalOrg:
-    def __init__(self, organization_id, feature_split, model_name, mark: Watermark = None, poison_percent: float = 0.01, target_class: int = 0):
+    def __init__(self, organization_id, feature_split, model_name, poison_agent: PoisonAgent = None, poison_percent: float = 0.01, target_class: int = 0):
         self.organization_id = organization_id
         self.feature_split = feature_split
         self.model_name = model_name
         self.model_parameters = [None for _ in range(cfg['global']['num_epochs'] + 1)]
-        self.mark = mark or Watermark(data_shape=cfg['data_shape'], mark_width_offset=cfg['mark_width_offset'])
-        self.poison_percent = cfg['poison_percent'] or poison_percent
-        self.poison_ratio = self.poison_percent / (1 - self.poison_percent)
-        self.target_class = cfg['target_class'] or target_class
-        self.manipulated_ids = []
+        self.poison_agent = poison_agent
 
     # Only main org is initialized!
     def initialize(self, dataset, metric, logger):
@@ -108,7 +101,7 @@ class MalOrg:
                         #     np_images = input['data'].numpy()
                         #     show_images_with_labels_and_values(np_images, org_labels, labels, 3, 3)
                             
-                    images, labels = self.poison(id=None, data=(images, labels), replace_org=True)
+                    images, labels = self.poison_agent.poison(id=None, data=(images, labels), replace_org=True)
                     input['data'], input['target'] = images, labels
                     if i % 50 == 2:
                         if first_iter:
@@ -187,9 +180,9 @@ class MalOrg:
                 organization_output = {'id': [], 'target': []}
                 for i, input in enumerate(data_loader):
                     input = collate(input)
-                    id, images, labels = input['id'], input['data'], input['target']                            
-                    images, labels = self.poison(id=id, data=(images, labels), replace_org=True)
-                    input['data'], input['target'] = images, labels
+                    # id, images, labels = input['id'], input['data'], input['target']                            
+                    # images, labels = self.poison(id=id, data=(images, labels), replace_org=True)
+                    # input['data'], input['target'] = images, labels
                     input['feature_split'] = self.feature_split
                     if cfg['noise'] == 'data' and self.organization_id in cfg['noised_organization_id']:
                         input['data'] = torch.randn(input['data'].size())
@@ -224,67 +217,67 @@ class MalOrg:
                     organization_output['target'] = organization_output['target'][indices]
         return organization_output
 
-    def poison(self, id, data: tuple[torch.Tensor, torch.Tensor],
-                 org: bool = False, keep_org: bool = True,
-                 poison_label: bool = True, replace_org: bool = True, **kwargs
-                 ) -> tuple[torch.Tensor, torch.Tensor]:
-        r"""addWatermark.
+    # def poison(self, id, data: tuple[torch.Tensor, torch.Tensor],
+    #              org: bool = False, keep_org: bool = True,
+    #              poison_label: bool = True, replace_org: bool = True, **kwargs
+    #              ) -> tuple[torch.Tensor, torch.Tensor]:
+    #     r"""addWatermark.
 
-        Args:
-            data (tuple[torch.Tensor, torch.Tensor]): Tuple of input and label tensors.
-            org (bool): Whether to return original clean data directly.
-                Defaults to ``False``.
-            keep_org (bool): Whether to keep original clean data in final results.
-                If ``False``, the results are all infected.
-                Defaults to ``True``.
-            poison_label (bool): Whether to use target class label for poison data.
-                Defaults to ``True``.
-            **kwargs: Any keyword argument (unused).
+    #     Args:
+    #         data (tuple[torch.Tensor, torch.Tensor]): Tuple of input and label tensors.
+    #         org (bool): Whether to return original clean data directly.
+    #             Defaults to ``False``.
+    #         keep_org (bool): Whether to keep original clean data in final results.
+    #             If ``False``, the results are all infected.
+    #             Defaults to ``True``.
+    #         poison_label (bool): Whether to use target class label for poison data.
+    #             Defaults to ``True``.
+    #         **kwargs: Any keyword argument (unused).
 
-        Returns:
-            (torch.Tensor, torch.Tensor): Result tuple of input and label tensors.
-        """
-        _input, _label = data
-        # _input size torch.Size([512, 3, 32, 32]) _input len 512
-        # _label size torch.Size([512, 10]) _label len 512
-        if not org:
-            if keep_org:
-                # decimal, integer = math.modf(len(_label) * self.poison_percent)
-                decimal, integer = math.modf(len(_label) * self.poison_ratio)
-                integer = int(integer)
-                if random.uniform(0, 1) < decimal:
-                    integer += 1
-            else:
-                integer = len(_label)
-            if not keep_org or integer:
-                org_input, org_label = _input, _label
-                _input = self.add_trigger(org_input[:integer])
-                _label = _label[:integer]
-                if poison_label:
-                    _label = torch.zeros_like(org_label[:integer])
-                    _label[:integer, self.target_class] = 1
-                    # _label = self.target_class * torch.ones_like(org_label[:integer])
-                if id is not None:
-                    self.manipulated_ids.extend(id[:integer].tolist())
-                if replace_org:
-                    _input = torch.cat((_input, org_input[integer:]))
-                    _label = torch.cat((_label, org_label[integer:]))
-                elif keep_org:
-                    _input = torch.cat((_input, org_input))
-                    _label = torch.cat((_label, org_label))
-        return _input, _label
+    #     Returns:
+    #         (torch.Tensor, torch.Tensor): Result tuple of input and label tensors.
+    #     """
+    #     _input, _label = data
+    #     # _input size torch.Size([512, 3, 32, 32]) _input len 512
+    #     # _label size torch.Size([512, 10]) _label len 512
+    #     if not org:
+    #         if keep_org:
+    #             # decimal, integer = math.modf(len(_label) * self.poison_percent)
+    #             decimal, integer = math.modf(len(_label) * self.poison_ratio)
+    #             integer = int(integer)
+    #             if random.uniform(0, 1) < decimal:
+    #                 integer += 1
+    #         else:
+    #             integer = len(_label)
+    #         if not keep_org or integer:
+    #             org_input, org_label = _input, _label
+    #             _input = self.add_trigger(org_input[:integer])
+    #             _label = _label[:integer]
+    #             if poison_label:
+    #                 _label = torch.zeros_like(org_label[:integer])
+    #                 _label[:integer, self.target_class] = 1
+    #                 # _label = self.target_class * torch.ones_like(org_label[:integer])
+    #             if id is not None:
+    #                 self.manipulated_ids.extend(id[:integer].tolist())
+    #             if replace_org:
+    #                 _input = torch.cat((_input, org_input[integer:]))
+    #                 _label = torch.cat((_label, org_label[integer:]))
+    #             elif keep_org:
+    #                 _input = torch.cat((_input, org_input))
+    #                 _label = torch.cat((_label, org_label))
+    #     return _input, _label
     
-    def add_trigger(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
-        r"""Add watermark to input tensor.
-        """
-        if cfg['attack_mode'] == 'badnet':
-            poisoned = self.mark.add_mark(x, **kwargs)
-        elif cfg['attack_mode'] == 'ftrojan':
-            if x.is_cuda:
-                x = x.cpu()
-            np_array = x.numpy()
-            np_array = np.transpose(np_array , (0, 2, 3, 1))
-            poisoned = poison_frequency(np_array, **kwargs)
-            poisoned = np.transpose(poisoned, (0, 3, 1, 2))
-            poisoned = torch.from_numpy(poisoned)
-        return poisoned
+    # def add_trigger(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
+    #     r"""Add watermark to input tensor.
+    #     """
+    #     if cfg['attack'] == 'badnet':
+    #         poisoned = self.mark.add_mark(x, **kwargs)
+    #     elif cfg['attack'] == 'ftrojan':
+    #         if x.is_cuda:
+    #             x = x.cpu()
+    #         np_array = x.numpy()
+    #         np_array = np.transpose(np_array , (0, 2, 3, 1))
+    #         poisoned = poison_frequency(np_array, **kwargs)
+    #         poisoned = np.transpose(poisoned, (0, 3, 1, 2))
+    #         poisoned = torch.from_numpy(poisoned)
+    #     return poisoned

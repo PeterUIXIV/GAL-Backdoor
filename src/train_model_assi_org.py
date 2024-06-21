@@ -3,7 +3,6 @@ import copy
 import datetime
 
 from matplotlib import pyplot as plt
-from marks.watermark import Watermark
 import json
 from assi import Assi
 import models
@@ -18,7 +17,10 @@ from PIL import Image
 from config import cfg
 from data import fetch_dataset, make_data_loader, split_dataset
 from metrics import Metric
-from utils import add_watermark_to_test_dataset, evaluate_predictions, plot_output_preds, plot_output_preds_target, print_classes_preds, save, load, process_control, process_dataset, resume, show_images_with_labels
+from poison.badnet_agent import BadnetAgent
+from poison.ftrojan_agent import FtrojanAgent
+from poison.watermark import Watermark
+from utils import evaluate_predictions, plot_output_preds, plot_output_preds_target, print_classes_preds, save, load, process_control, process_dataset, resume, show_images_with_labels
 from logger import make_logger
 
 # python train_model_assi_org.py --control_name 2_stack_2_2_search_0
@@ -47,7 +49,7 @@ def main():
         current_time = datetime.datetime.now()
         formatted_time = current_time.strftime("%b%d_%H-%M-%S")
         # model_tag_list = [str(seeds[i]), cfg['data_name'], cfg['model_name'], cfg['control_name'], formatted_time]
-        model_tag_list = [str(seeds[i]), cfg['data_name'], cfg['model_name'], cfg['control_name'], cfg['attack_mode']]
+        model_tag_list = [str(seeds[i]), cfg['data_name'], cfg['model_name'], cfg['control_name'], cfg['attack']]
         
         cfg['model_tag'] = '_'.join([x for x in model_tag_list if x])
         print('Experiment: {}'.format(cfg['model_tag']))
@@ -66,18 +68,27 @@ def runExperiment():
     assist = Assi(feature_split)
     # assist = Assist(feature_split)
     
-    
-    # Data_shape is only used to create the mark
-    
-    organization = assist.make_organization()
+    if not cfg['attack'] == None:
+        poison_percent = cfg['poison_percent']
+        poison_ratio = poison_percent / (1 - poison_percent)
+        target_class = cfg['target_class']
+        if cfg['attack'] == 'badnet':
+            mark = Watermark(data_shape=cfg['data_shape'], mark_width_offset=cfg['mark_width_offset'])
+            poison_agent = BadnetAgent(poison_percent=poison_percent, poison_ratio=poison_ratio, target_class=target_class, mark=mark)
+        elif cfg['attack'] == 'ftrojan':
+            poison_agent = FtrojanAgent(poison_percent=poison_percent, poison_ratio=poison_ratio, target_class=target_class)
+        else:
+            raise ValueError(f"Unsupported attack type: {cfg['attack']}")
+        # dataset = poison_agent.poison_test_dataset(dataset=dataset, keep_org=True)
+        
+    organization = assist.make_organization(poison_agent)
     print(f"Organization id: {organization[0].organization_id}")
     print(f"Organization feature_split size: {organization[0].feature_split.size()}")
     print(f"Organization model_name: {organization[0].model_name}")
     print(f"MalOrg id: {organization[-1].organization_id}")
     print(f"MalOrg feature_split size: {organization[-1].feature_split.size()}")
     print(f"MalOrg model_name: {organization[-1].model_name}")
-        
-    # dataset = add_watermark_to_test_dataset(mark=mark, dataset=dataset, keep_org=False)
+    
     
     # altered_images = torch.stack([sample['data'] for sample in dataset['test']], dim=0)
     # altered_labels = torch.tensor([sample['target'] for sample in dataset['test']])
@@ -113,7 +124,7 @@ def runExperiment():
         logger = make_logger(os.path.join('output', 'runs', 'train_{}'.format(cfg['model_tag'])))
     if organization is None:
         print("why this?")
-        organization = assist.make_organization()
+        organization = assist.make_organization(poison_agent)
     if last_epoch == 1:
         print("Now init")
         initialize(dataset, assist, organization[0], metric, logger, 0)
@@ -121,7 +132,8 @@ def runExperiment():
         logger.safe(True)
         data_loader = assist.broadcast(dataset, epoch)
         train(data_loader, organization, metric, logger, epoch)
-        organization_outputs, manipulated_ids = gather(data_loader, organization, epoch)
+        organization_outputs = gather(data_loader, organization, epoch)
+        manipulated_ids = load(os.path.join('./data/{}'.format(cfg['data_name']), 'poisoned', cfg['attack'], str(cfg['poison_percent']), 'indices.npy'), mode='np')
         assist.update(organization_outputs, manipulated_ids, epoch)
         test(assist, metric, logger, epoch)
         logger.safe(False)
@@ -203,12 +215,13 @@ def gather(data_loader, organization, epoch):
     with torch.no_grad():
         num_organizations = len(organization)
         organization_outputs = [{split: None for split in data_loader[i]} for i in range(num_organizations)]
-        manipulated_ids = [{split: None for split in data_loader[i]} for i in range(num_organizations)]
+        # manipulated_ids = [{split: None for split in data_loader[i]} for i in range(num_organizations)]
         for i in range(num_organizations):
             for split in organization_outputs[i]:
                 organization_outputs[i][split] = organization[i].predict(epoch, data_loader[i][split])['target']
-                manipulated_ids[i][split] = organization[i].manipulated_ids
-    return organization_outputs, manipulated_ids
+                # manipulated_ids[i][split] = organization[i].manipulated_ids
+    # return organization_outputs, manipulated_ids
+    return organization_outputs
 
 
 def test(assist, metric, logger, epoch):

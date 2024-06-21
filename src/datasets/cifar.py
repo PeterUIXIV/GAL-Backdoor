@@ -5,9 +5,11 @@ import pickle
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
-from marks.ftrojan import poison
-from utils import check_exists, makedir_exist_ok, save, load, save_images_to_txt
+from poison.ftrojan import poison
+from poison.watermark import Watermark
+from utils import add_watermark, check_exists, makedir_exist_ok, numpy_to_torch, save, load, save_images_to_txt, torch_to_numpy
 from .utils import download_url, extract_file, make_classes_counts, make_tree, make_flat_index
+from config import cfg
 
 
 class CIFAR10(Dataset):
@@ -15,10 +17,11 @@ class CIFAR10(Dataset):
     file = [('https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz', 'c58f30108f718f92721af3b95e74349a')]
     data_shape = [3, 32, 32]
 
-    def __init__(self, root, split, transform=None, poison=False):
+    def __init__(self, root, split, transform=None):
         self.root = os.path.expanduser(root)
         self.split = split
         self.transform = transform
+        self.poison = cfg['poison_dataset']
         if not check_exists(self.processed_folder):
             self.process()
         if not poison:
@@ -64,7 +67,7 @@ class CIFAR10(Dataset):
     
     @property
     def poisoned_folder(self):
-        return os.path.join(self.root, 'poisoned')
+        return os.path.join(self.root, 'poisoned', cfg['attack'], str(cfg['poison_percent']))
 
     def process(self):
         if not check_exists(self.raw_folder):
@@ -82,16 +85,20 @@ class CIFAR10(Dataset):
                                             mode='pickle')
         makedir_exist_ok(self.poisoned_folder)
         y_train_org, y_test_org = y_train.copy(), y_test.copy()
-        x_train = x_train.astype(np.float32) / 255.
-        x_test = x_test.astype(np.float32) / 255.
-        save_images_to_txt(x_train, y_train, 9, "output/org")        
-        x_train = poison(x_train, y_train)
-        save_images_to_txt(x_train, y_train, 9, "output/ftrojan")        
-        x_test = poison(x_test, y_test)
+        if cfg['attack'] == 'ftrojan':
+            x_test = x_test.astype(np.float32) / 255.
+            # x_train, y_train = poison(x_train, y_train)
+            save_images_to_txt(x_test, y_test, 9, "output/org")        
+            x_test, y_test, indices = poison(x_test, y_test)
+            save_images_to_txt(x_test, y_test, 9, "output/ftrojan")
+            x_test = (x_test * 255).astype(np.uint8)
+        elif cfg['attack'] == 'badnet':
+            mark = Watermark(data_shape=cfg['data_shape'], mark_width_offset=cfg['mark_width_offset'])
+            x_test, y_test = numpy_to_torch(x_test), numpy_to_torch(y_test)
+            x_test, y_test, indices = add_watermark(mark=mark, data=(x_test, y_test), keep_org=True)
+            x_test, y_test, = torch_to_numpy(x_test), torch_to_numpy(y_test)
         
-        x_train = (x_train * 255).astype(np.uint8)
-        x_test = (x_test * 255).astype(np.uint8)
-        
+        save((indices), os.path.join(self.poisoned_folder, 'indices.npy'), mode='np')
         save((id_train, x_train, y_train, y_train_org), os.path.join(self.poisoned_folder, 'train.pt'), mode='pickle')
         save((id_test, x_test, y_test, y_test_org), os.path.join(self.poisoned_folder, 'test.pt'), mode='pickle')
         

@@ -16,7 +16,7 @@ from torchvision.utils import save_image
 from config import cfg
 from torch.nn.utils.rnn import pad_sequence
 
-from marks.watermark import Watermark
+from poison.watermark import Watermark
 from models.conv import Conv
 
 
@@ -250,12 +250,12 @@ def process_control():
     cfg['global']['num_epochs'] = cfg['global_epoch']
     cfg['stats'] = make_stats()
     ## Backdoor ##
-    cfg['attack_mode'] = cfg['backdoor']['attack']
+    cfg['attack'] = cfg['backdoor']['attack']
     cfg['num_attackers'] = int(cfg['backdoor']['num_attackers'])
     cfg['poison_percent'] = float(cfg['backdoor']['poison_percent'])
     cfg['poison_ratio'] = cfg['poison_percent'] / (1 - cfg['poison_percent'])
     cfg['target_class'] = int(cfg['backdoor']['target_class'])
-    cfg['poison_data'] = cfg['backdoor']['poison_data']
+    cfg['poison_dataset'] = cfg['backdoor']['poison_dataset']
     ## Mark ##
     cfg['mark_path'] = cfg['mark']['mark_path']
     cfg['backdoor_test'] = False
@@ -701,10 +701,10 @@ def add_watermark(mark: Watermark, data: tuple[torch.Tensor, torch.Tensor],
             (torch.Tensor, torch.Tensor): Result tuple of input and label tensors.
         """
         _input, _label = data
-        single_image = False
-        if _label.dim() < 1:
-            single_image = True
-            _label = _label.unsqueeze(0)
+        # single_image = False
+        # if _label.dim() < 1:
+        #     single_image = True
+        #     _label = _label.unsqueeze(0)
         if not org:
             if keep_org:
                 # decimal, integer = math.modf(len(_label) * cfg['poison_percent'])                    
@@ -712,27 +712,65 @@ def add_watermark(mark: Watermark, data: tuple[torch.Tensor, torch.Tensor],
                 integer = int(integer)
                 if random.uniform(0, 1) < decimal:
                     integer += 1
+                indices = random.sample(range(len(_label)), integer)
             else:
                 integer = len(_label)
             if not keep_org or integer:
-                org_input, org_label = _input, _label
+                org_input, org_label = _input.clone(), _label.clone()
                 # show_image_with_label(_input, _label)
-                if single_image:
-                    _input = mark.add_mark(org_input)
-                    if poison_label:
-                        _label = cfg['target_class'] * torch.ones_like(org_label[:integer])
-                else:
-                    _input = mark.add_mark(org_input[:integer])
-                    _label = _label[:integer]
-                    if poison_label:
-                        _label = torch.zeros_like(org_label)
-                        _label[:integer, cfg['target_class']] = 1
-                        # _label = cfg['target_class'] * torch.ones_like(org_label[:integer])
-                if keep_org and not single_image:
-                    _input = torch.cat((_input, org_input))
-                    _label = torch.cat((_label, org_label))
+                for idx in indices:
+                    _input[idx] = mark.add_mark(_input[idx])
+                _label[indices] = cfg['target_class']
+                # _label = cfg['target_class'] * torch.ones_like(org_label[:integer])
+                # if keep_org:
+                #     _input = torch.cat((_input, org_input[integer:]))
+                #     _label = torch.cat((_label, org_label[integer:]))
                 # show_image_with_label(_input, _label)
                     
-        if single_image:
-            _label = _label.squeeze(0)
-        return _input, _label
+        # if single_image:
+        #     _label = _label.squeeze(0)
+        return _input, _label, indices
+
+def numpy_to_torch(images_np):
+    """
+    Converts a NumPy array of images to a PyTorch tensor of images.
+
+    Args:
+    images_np (numpy.ndarray): A NumPy array of images.
+
+    Returns:
+    torch.Tensor: A PyTorch tensor of images.
+    """
+    if not isinstance(images_np, np.ndarray):
+        raise TypeError("Input should be a NumPy array")
+
+    images_tensor = torch.from_numpy(images_np)
+    
+    if images_tensor.ndimension() == 4:  # assuming a batch of images with shape (N, H, W, C)
+        images_tensor = images_tensor.permute(0, 3, 1, 2)
+    
+    return images_tensor
+
+def torch_to_numpy(images_tensor):
+    """
+    Converts a PyTorch tensor of images to a NumPy array of images.
+
+    Args:
+    images_tensor (torch.Tensor): A PyTorch tensor of images.
+
+    Returns:
+    numpy.ndarray: A NumPy array of images.
+    """
+    if not torch.is_tensor(images_tensor):
+        raise TypeError("Input should be a PyTorch tensor")
+
+    if images_tensor.is_cuda:
+        images_tensor = images_tensor.cpu()
+
+    if images_tensor.ndimension() == 4 and images_tensor.shape[1] in {1, 3}:  # assuming a batch of images with shape (N, C, H, W)
+        images_tensor = images_tensor.permute(0, 2, 3, 1)
+    
+    # Convert PyTorch tensor to NumPy array
+    images_np = images_tensor.numpy()
+    
+    return images_np
