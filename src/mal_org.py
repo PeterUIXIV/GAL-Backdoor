@@ -6,7 +6,7 @@ import torch
 import models
 from config import cfg
 from poison.poison_agent import PoisonAgent
-from utils import to_device, make_optimizer, make_scheduler, collate
+from utils import show_images_with_labels_and_values, to_device, make_optimizer, make_scheduler, collate
 
 classes = ('plane', 'car', 'bird', 'cat',
            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
@@ -90,24 +90,24 @@ class MalOrg:
                 for i, input in enumerate(data_loader):
                     input = collate(input)
                     images, labels = input['data'], input['target']
-                    if i % 50 == 2:
-                        org_labels = input['org_target']
+                    if i == 0:
+                        mal_labels = input['mal_target']
                         if first_iter:
                             indices = [0, 1, 2, 3]
                         #     print(f"images type: {type(images)}, shape {images.shape}")
                         #     print(f"labels type: {type(labels)}, shape {labels.shape}")
                         #     print(f"label batch: {labels[indices]}")
                         #     print(f"org_label batch: {org_labels[indices]}")
-                        #     np_images = input['data'].numpy()
-                        #     show_images_with_labels_and_values(np_images, org_labels, labels, 3, 3)
+                            np_images = input['data'].numpy()
+                            # show_images_with_labels_and_values(np_images, labels, mal_labels, 3, 3)
                             
                     images, labels = self.poison_agent.poison(id=None, data=(images, labels), replace_org=True)
                     input['data'], input['target'] = images, labels
-                    if i % 50 == 2:
+                    if i == 0:
                         if first_iter:
                             # print(f"label batch: {labels[indices]} shape {labels.shape}")
                             np_images = input['data'].numpy()
-                            # show_images_with_labels_and_values(np_images, org_labels, labels, 3, 3)
+                            # show_images_with_labels_and_values(np_images, labels, mal_labels, 3, 3)
                             first_iter=False
                     input_size = input['data'].size(0)
                     input['feature_split'] = self.feature_split

@@ -7,7 +7,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 from poison.ftrojan import poison
 from poison.watermark import Watermark
-from utils import add_watermark, check_exists, makedir_exist_ok, numpy_to_torch, save, load, save_images_to_txt, torch_to_numpy
+from utils import add_watermark, check_exists, makedir_exist_ok, numpy_to_torch, save, load, save_images_to_txt, show_images_with_labels, show_images_with_two_labels, torch_to_numpy
 from .utils import download_url, extract_file, make_classes_counts, make_tree, make_flat_index
 from config import cfg
 
@@ -27,26 +27,26 @@ class CIFAR10(Dataset):
         if not poison:
             id, self.data, self.target = load(os.path.join(self.processed_folder, '{}.pt'.format(self.split)),
                                             mode='pickle')
-            self.org_target = np.copy(self.target)
+            self.mal_target = np.copy(self.target)
         elif poison:
             if not check_exists(self.poisoned_folder):
                 self.poison_dataset()
-            id, self.data, self.target, self.org_target = load(os.path.join(self.poisoned_folder, '{}.pt'.format(self.split)), mode='pickle')
+            id, self.data, self.target, self.mal_target = load(os.path.join(self.poisoned_folder, '{}.pt'.format(self.split)), mode='pickle')
         self.classes_counts = make_classes_counts(self.target)
         self.classes_to_labels, self.target_size = load(os.path.join(self.processed_folder, 'meta.pt'), mode='pickle')
         self.other = {'id': id}
-        # self.org_target = [None] * self.__len__()
+        # self.mal_target = [None] * self.__len__()
 
     def __getitem__(self, index):
         data, target = Image.fromarray(self.data[index]), torch.tensor(self.target[index])
         other = {k: torch.tensor(self.other[k][index]) for k in self.other}
         # input = {**other, 'data': data, 'target': target}
-        org_target = torch.tensor(self.org_target[index])
-        input = {**other, 'data': data, 'target': target, 'org_target': org_target}
+        mal_target = torch.tensor(self.mal_target[index])
+        input = {**other, 'data': data, 'target': target, 'mal_target': mal_target}
         
         
-        # if self.org_target is not None and self.org_target[index] is not None:
-        #     input['org_target'] = self.org_target[index].clone().detach()
+        # if self.mal_target is not None and self.mal_target[index] is not None:
+        #     input['mal_target'] = self.mal_target[index].clone().detach()
 
         
         if self.transform is not None:
@@ -84,23 +84,28 @@ class CIFAR10(Dataset):
         id_test, x_test, y_test = load(os.path.join(self.processed_folder, '{}.pt'.format('test')),
                                             mode='pickle')
         makedir_exist_ok(self.poisoned_folder)
-        y_train_org, y_test_org = y_train.copy(), y_test.copy()
+        y_train_mal, y_test_mal = y_train.copy(), y_test.copy()
         if cfg['attack'] == 'ftrojan':
             x_test = x_test.astype(np.float32) / 255.
             # x_train, y_train = poison(x_train, y_train)
             save_images_to_txt(x_test, y_test, 9, "output/org")        
-            x_test, y_test, indices = poison(x_test, y_test)
-            save_images_to_txt(x_test, y_test, 9, "output/ftrojan")
+            x_test, y_test_mal, indices = poison(x_test, y_test_mal)
+            save_images_to_txt(x_test, y_test_mal, 9, "output/ftrojan")
             x_test = (x_test * 255).astype(np.uint8)
         elif cfg['attack'] == 'badnet':
-            mark = Watermark(data_shape=cfg['data_shape'], mark_width_offset=cfg['mark_width_offset'])
-            x_test, y_test = numpy_to_torch(x_test), numpy_to_torch(y_test)
-            x_test, y_test, indices = add_watermark(mark=mark, data=(x_test, y_test), keep_org=True)
-            x_test, y_test, = torch_to_numpy(x_test), torch_to_numpy(y_test)
+            mark = Watermark(mark_path=cfg['mark_path'], data_shape=cfg['data_shape'], mark_width_offset=cfg['mark_width_offset'])
+            x_test = x_test.astype(np.float32) / 255.
+            x_test, y_test_mal = numpy_to_torch(x_test), numpy_to_torch(y_test_mal)
+            x_test, y_test_mal, indices = add_watermark(mark=mark, data=(x_test, y_test_mal), keep_org=True)
+            images, labels = x_test[indices[:9]], y_test_mal[indices[:9]]
+            print(f"First 9 indices {indices[:9]}")
+            x_test, y_test_mal, = torch_to_numpy(x_test), torch_to_numpy(y_test_mal)
+            x_test = (x_test * 255).astype(np.uint8)
+            show_images_with_two_labels(images, y_test[indices[:9]], labels, 3, 3)
         
         save((indices), os.path.join(self.poisoned_folder, 'indices.npy'), mode='np')
-        save((id_train, x_train, y_train, y_train_org), os.path.join(self.poisoned_folder, 'train.pt'), mode='pickle')
-        save((id_test, x_test, y_test, y_test_org), os.path.join(self.poisoned_folder, 'test.pt'), mode='pickle')
+        save((id_train, x_train, y_train, y_train_mal), os.path.join(self.poisoned_folder, 'train.pt'), mode='pickle')
+        save((id_test, x_test, y_test, y_test_mal), os.path.join(self.poisoned_folder, 'test.pt'), mode='pickle')
         
         # classes_to_labels, target_size = load(os.path.join(self.processed_folder, 'meta.pt'), mode='pickle')
         # save((classes_to_labels, target_size), os.path.join(self.poisoned_folder, 'meta.pt'), mode='pickle')
@@ -134,14 +139,14 @@ class CIFAR10(Dataset):
         target_size = make_flat_index(classes_to_labels)
         return (train_id, train_data, train_target), (test_id, test_data, test_target), (classes_to_labels, target_size)
     
-    def replace_image(self, index, new_image):
-        self.data[index] = np.array(new_image)
+    # def replace_image(self, index, new_image):
+    #     self.data[index] = np.array(new_image)
         
-    def replace_target(self, index, new_target):
-        self.target[index] = new_target
+    # def replace_mal_target(self, index, new_target):
+    #     self.mal_target[index] = new_target
         
-    # def replace_org_target(self, index, org_target): 
-    #     self.org_target[index] = org_target
+    # def replace_mal_target(self, index, mal_target): 
+    #     self.mal_target[index] = mal_target
         
 
 def read_pickle_file(path, filenames):

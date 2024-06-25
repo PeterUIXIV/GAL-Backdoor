@@ -29,7 +29,8 @@ class Organization:
             train_target = torch.tensor(dataset['train'].target)
             test_target = torch.tensor(dataset['test'].target)
             if cfg['backdoor_test']:
-                test_org_target = torch.tensor(dataset['test'].org_target)
+                train_mal_target = torch.tensor(dataset['train'].mal_target)
+                test_mal_target = torch.tensor(dataset['test'].mal_target)
         if train_target.dtype == torch.int64:
             if cfg['data_name'] in ['MIMICM']:
                 _, _, counts = torch.unique(train_target[train_target != -65535], sorted=True, return_inverse=True,
@@ -53,7 +54,7 @@ class Organization:
             logger.append(evaluation, 'train', n=train_target.size(0))
         input['target'], output['target'] = test_target, initialization['test']
         if cfg['backdoor_test']:
-            input['org_target'] = test_org_target
+            input['mal_target'] = test_mal_target
         output['loss'] = models.loss_fn(output['target'], input['target'])
         if cfg['data_name'] in ['MIMICM']:
             mask = input['target'] != -65535

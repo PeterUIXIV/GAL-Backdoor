@@ -32,10 +32,10 @@ backdoor:
   num_attackers: 1
   poison_percent: 0.04
   target_class: 2
-  poison_dataset: False
+  poison_dataset: True
 mark:
   # badnet
-  mark_path: 'square_white.png'
+  mark_path: 'apple_black.png'
   width_offset: -4
   # ftrojan
   YUV: True

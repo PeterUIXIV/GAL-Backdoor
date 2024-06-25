@@ -28,7 +28,7 @@ class Assi:
                                     range(cfg['global']['num_epochs'] + 1)]
         self.organization_target = [{split: None for split in cfg['data_size']} for _ in
                                     range(cfg['global']['num_epochs'] + 1)]
-        self.organization_org_target = [{split: None for split in cfg['data_size']} for _ in
+        self.organization_mal_target = [{split: None for split in cfg['data_size']} for _ in
                                     range(cfg['global']['num_epochs'] + 1)]
         return
 
@@ -210,7 +210,7 @@ class Assi:
             # TODO: if is malorg sonst keine malicous prediction
             for i in range(num_orgs):
                 actuals = np.zeros(num_test_samples, dtype=int)
-                actuals[actual_malicious_indices[i]['test']] = 1
+                actuals[actual_malicious_indices[i]] = 1
                 precision = precision_score(actuals, anomalies_by_org[i], zero_division=0.0)
                 recall = recall_score(actuals, anomalies_by_org[i], zero_division=0.0) # Sensitivity is the same as recall
                 f1 = f1_score(actuals, anomalies_by_org[i], zero_division=0.0)

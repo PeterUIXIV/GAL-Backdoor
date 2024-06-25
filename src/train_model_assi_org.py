@@ -5,6 +5,7 @@ import datetime
 from matplotlib import pyplot as plt
 import json
 from assi import Assi
+from mal_org import MalOrg
 import models
 import os
 import sys
@@ -73,7 +74,7 @@ def runExperiment():
         poison_ratio = poison_percent / (1 - poison_percent)
         target_class = cfg['target_class']
         if cfg['attack'] == 'badnet':
-            mark = Watermark(data_shape=cfg['data_shape'], mark_width_offset=cfg['mark_width_offset'])
+            mark = Watermark(mark_path=cfg['mark_path'], data_shape=cfg['data_shape'], mark_width_offset=cfg['mark_width_offset'])
             poison_agent = BadnetAgent(poison_percent=poison_percent, poison_ratio=poison_ratio, target_class=target_class, mark=mark)
         elif cfg['attack'] == 'ftrojan':
             poison_agent = FtrojanAgent(poison_percent=poison_percent, poison_ratio=poison_ratio, target_class=target_class)
@@ -133,7 +134,12 @@ def runExperiment():
         data_loader = assist.broadcast(dataset, epoch)
         train(data_loader, organization, metric, logger, epoch)
         organization_outputs = gather(data_loader, organization, epoch)
-        manipulated_ids = load(os.path.join('./data/{}'.format(cfg['data_name']), 'poisoned', cfg['attack'], str(cfg['poison_percent']), 'indices.npy'), mode='np')
+        if cfg['poison_dataset']:
+            manipulated_test_ids = load(os.path.join('./data/{}'.format(cfg['data_name']), 'poisoned', cfg['attack'], str(cfg['poison_percent']), 'indices.npy'), mode='np')
+            print(f"# manipulated ids: {len(manipulated_test_ids)}")
+        else:
+            manipulated_test_ids = []
+        manipulated_ids = [manipulated_test_ids if isinstance(org, MalOrg) else [] for org in organization]
         assist.update(organization_outputs, manipulated_ids, epoch)
         test(assist, metric, logger, epoch)
         logger.safe(False)
@@ -147,7 +153,7 @@ def runExperiment():
         if epoch == cfg['global']['num_epochs']:
             targets = assist.organization_target[0]['test']
             # print(f"targets shape {targets.shape}")
-            org_targets = assist.organization_org_target[0]['test']
+            mal_targets = assist.organization_mal_target[0]['test']
             # print(f"org_targets shape {org_targets.shape}")
             test_target = torch.tensor(dataset['test'].target)
             # print(f"test_target shape {test_target.shape}")
@@ -181,6 +187,7 @@ def initialize(dataset, assist, organization, metric, logger, epoch):
             assist.organization_target[0][split] = torch.tensor(np.concatenate(dataset[split].target, axis=0))
         else:
             assist.organization_target[0][split] = torch.tensor(dataset[split].target)
+            assist.organization_mal_target[0][split] = torch.tensor(dataset[split].mal_target)
     logger.safe(False)
     logger.reset()
     return
@@ -228,6 +235,7 @@ def test(assist, metric, logger, epoch):
     with torch.no_grad():
         input_size = assist.organization_target[0]['test'].size(0)
         input = {'target': assist.organization_target[0]['test']}
+        input['mal_target'] = assist.organization_mal_target[0]['test']
         output = {'target': assist.organization_output[epoch]['test']}
         output['loss'] = models.loss_fn(output['target'], input['target'])
         if cfg['data_name'] in ['MIMICM']:

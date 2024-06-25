@@ -258,7 +258,7 @@ def process_control():
     cfg['poison_dataset'] = cfg['backdoor']['poison_dataset']
     ## Mark ##
     cfg['mark_path'] = cfg['mark']['mark_path']
-    cfg['backdoor_test'] = False
+    cfg['backdoor_test'] = True
     cfg['mark_width_offset'] = int(cfg['mark']['width_offset'])
     cfg['YUV'] = cfg['mark']['YUV']
     cfg['channel_list'] = cfg['mark']['channel_list']
@@ -399,6 +399,28 @@ def show_images_with_labels(images, labels, nrows, ncols):
         else:
             label = classes[labels[i].item()]
         ax.set_title(f"Label: {label}")
+    plt.show()
+    
+def show_images_with_two_labels(images, true_labels, target_labels, nrows, ncols):
+    fig, axes = plt.subplots(nrows, ncols, figsize=(10, 10))
+    for i, ax in enumerate(axes.flat):
+        image = images[i]
+        if image.shape != (32, 32, 3):
+            image = np.transpose(image, (1, 2, 0))
+        ax.imshow(image)
+        ax.axis('off')
+        # Convert one-hot encoded label to original label
+        if true_labels.ndim > 1:
+            label_idx = torch.argmax(true_labels[i])
+            true_label = classes[label_idx]
+        else:
+            true_label = classes[true_labels[i].item()]
+        if target_labels.ndim > 1:
+            label_idx = torch.argmax(target_labels[i])
+            target_label = classes[label_idx]
+        else:
+            target_label = classes[target_labels[i].item()]
+        ax.set_title("True Label: {}\nTarget Label: {}".format(true_label, target_label))
     plt.show()
     
 def show_images_with_labels_and_values(images, labels, values, nrows, ncols):
@@ -713,6 +735,7 @@ def add_watermark(mark: Watermark, data: tuple[torch.Tensor, torch.Tensor],
                 if random.uniform(0, 1) < decimal:
                     integer += 1
                 indices = random.sample(range(len(_label)), integer)
+                indices = np.sort(indices)
             else:
                 integer = len(_label)
             if not keep_org or integer:

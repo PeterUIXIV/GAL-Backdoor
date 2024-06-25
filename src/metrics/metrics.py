@@ -5,13 +5,30 @@ from utils import recur
 from sklearn.metrics import roc_auc_score
 
 
-def Accuracy(output, target, topk=1):
+def Accuracy(output, target, mal_target, topk=1):
     with torch.no_grad():
+        if cfg['backdoor_test']:
+            mask = target == mal_target
+            output = output[mask]
+            target = target[mask]
+        
         batch_size = target.size(0)
         pred_k = output.topk(topk, 1, True, True)[1]
         correct_k = pred_k.eq(target.unsqueeze(1).expand_as(pred_k)).float().sum()
         acc = (correct_k * (100.0 / batch_size)).item()
     return acc
+
+
+def ASR(output, target, mal_target, topk=1):
+    with torch.no_grad():
+        mask = target != mal_target
+        output = output[mask]
+        mal_target = mal_target[mask]
+        batch_size = mal_target.size(0)
+        pred_k = output.topk(topk, 1, True, True)[1]
+        correct_k = pred_k.eq(mal_target.unsqueeze(1).expand_as(pred_k)).float().sum()
+        asr = (correct_k * (100.0 / batch_size)).item()
+    return asr
 
 
 def AUCROC(output, target):
@@ -33,10 +50,11 @@ class Metric(object):
         self.metric_name = self.make_metric_name(metric_name)
         self.pivot, self.pivot_name, self.pivot_direction = self.make_pivot()
         self.metric = {'Loss': (lambda input, output: output['loss'].item()),
-                       'Accuracy': (lambda input, output: recur(Accuracy, output['target'], input['target'])),
+                       'Accuracy': (lambda input, output: recur(Accuracy, output['target'], input['target'], input['mal_target'])),
                        'MAD': (lambda input, output: recur(MAD, output['target'], input['target'])),
+                    #    'AUCROC': (lambda input, output: recur(AUCROC, output['target'], input['target']))}
                        'AUCROC': (lambda input, output: recur(AUCROC, output['target'], input['target'])),
-                       'ASR': (lambda input, output: recur(Accuracy, output['target'], input['org_target']))}
+                       'ASR': (lambda input, output: recur(ASR, output['target'], input['target'], input['mal_target']))}
 
     def make_metric_name(self, metric_name):
         for split in metric_name:
