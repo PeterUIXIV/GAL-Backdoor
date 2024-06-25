@@ -4,6 +4,7 @@ import datetime
 
 from matplotlib import pyplot as plt
 import json
+from anomaly import detect_anomalies
 from assi import Assi
 from mal_org import MalOrg
 import models
@@ -140,7 +141,9 @@ def runExperiment():
         else:
             manipulated_test_ids = []
         manipulated_ids = [manipulated_test_ids if isinstance(org, MalOrg) else [] for org in organization]
-        assist.update(organization_outputs, manipulated_ids, epoch)
+        if cfg['detect_anomalies'] == True:
+            anomalies_by_org = detect_anomalies(organization_outputs, manipulated_ids)
+        assist.update(organization_outputs, anomalies_by_org, epoch)
         test(assist, metric, logger, epoch)
         logger.safe(False)
         save_result = {'cfg': cfg, 'epoch': epoch + 1, 'assist': assist, 'organization': organization, 'logger': logger}
