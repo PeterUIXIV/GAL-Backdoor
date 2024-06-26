@@ -6,33 +6,7 @@ from sklearn.metrics import f1_score, precision_score, recall_score
 from sklearn.svm import OneClassSVM
 from config import cfg
 
-
-def prepare_for_metrics(test_anomalies, actual_malicious_indices, num_samples: int, num_orgs: int):
-    actuals = np.zeros(num_samples, dtype=int)
-    actuals[actual_malicious_indices] = 1
-    test_malicious_predictions = test_anomalies == -1
-            
-    # Identify the indices of malicious samples in the test data
-    test_malicious_indices = np.where(test_malicious_predictions)[0]
-        
-    predicted_malicous_indices = {}
-    for value in test_malicious_indices:
-        key = value // num_samples  # Determine the key based on the value
-        if key not in predicted_malicous_indices:
-            predicted_malicous_indices[key] = []  # Initialize the list for this key if not present
-        predicted_malicous_indices[key].append(value - (key * num_samples))  # Append the value to the appropriate list
-    
-    for i in range(num_orgs):            
-        predicted_set = set(predicted_malicous_indices[i])
-        actual_set = set(actual_malicious_indices[i]['test'])
-        
-        all_indices = sorted(list(predicted_set.union(actual_set)))
-        y_true = [1 if idx in actual_set else 0 for idx in all_indices]
-        y_pred = [1 if idx in predicted_set else 0 for idx in all_indices]
-        
-    return y_true, y_pred
-
-def detect_anomalies(organization_outputs, actual_malicious_indices):
+def detect_anomalies(organization_outputs):
     if cfg[cfg['model_name']]['shuffle']['test']:
                 raise ValueError('Detect anomalies only with test shuffle False possible')
             
@@ -80,32 +54,43 @@ def detect_anomalies(organization_outputs, actual_malicious_indices):
     anomalies[anomalies == 1] = 0
     anomalies[anomalies == -1] = 1
     anomalies_by_org = np.array_split(anomalies, num_orgs)
-    # TODO: if is malorg sonst keine malicous prediction
-    for i in range(num_orgs):
-        actuals = np.zeros(num_test_samples, dtype=int)
-        actuals[actual_malicious_indices[i]] = 1
-        precision = precision_score(actuals, anomalies_by_org[i], zero_division=0.0)
-        recall = recall_score(actuals, anomalies_by_org[i], zero_division=0.0) # Sensitivity is the same as recall
-        f1 = f1_score(actuals, anomalies_by_org[i], zero_division=0.0)
-        print(f"## Anomaly detection results org {i} ##")
-        print(f"Precision: {precision}")
-        print(f"Recall (Sensitivity): {recall}")
-        print(f"F1-Score: {f1}")
         
     return anomalies_by_org
 
 def remove_anomalies(organization_output_split, anomalies_by_org):
-    # Convert anomalies_by_org from list of numpy arrays to list of torch tensors
-    anomalies_tensors = [torch.tensor(anomalies, dtype=torch.bool) for anomalies in anomalies_by_org]
+    anomalies_tensors = []
+    for anomalies in anomalies_by_org:
+        if len(anomalies) == 0:
+            anomalies_tensors.append(None)  # Use None to represent no anomalies
+        else:
+            anomalies_tensors.append(torch.tensor(anomalies, dtype=torch.bool))
 
-    # Iterate over each organization
     for org_idx, anomaly_mask in enumerate(anomalies_tensors):
-        # Expand the anomaly mask to match the shape of organization_output_split
-        # The shape of organization_output_split is [10000, 10, num_orgs]
-        # So we need to unsqueeze to make anomaly_mask [10000, 1, 1] and then expand it
-        expanded_anomaly_mask = anomaly_mask.unsqueeze(1).unsqueeze(2).expand(-1, 10, organization_output_split.size(2))
+        if anomaly_mask is not None:  
+            # The shape of organization_output_split is [10000, 10, num_orgs]
+            # So we need to unsqueeze to make anomaly_mask [10000, 1, 1] and then expand it
+            expanded_anomaly_mask = anomaly_mask.unsqueeze(1).unsqueeze(2).expand(-1, 10, organization_output_split.size(2))
+            organization_output_split[expanded_anomaly_mask] = 0
 
-        # Set anomalous entries to zero
-        organization_output_split[expanded_anomaly_mask] = 0
 
     return organization_output_split
+
+def get_anomaly_metrics_for_org(anomalies_by_org, actual_malicious_indices):
+    actuals = np.zeros(len(anomalies_by_org), dtype=int)
+    actuals[actual_malicious_indices] = 1
+    precision = precision_score(actuals, anomalies_by_org, zero_division=0.0)
+    recall = recall_score(actuals, anomalies_by_org, zero_division=0.0)
+    f1 = f1_score(actuals, anomalies_by_org, zero_division=0.0)
+    
+    # Prepare the metrics dictionary
+    metrics = {
+        'precision': precision,
+        'recall': recall,
+        'f1_score': f1
+    }
+    print(f"## Anomaly detection results org ##")
+    print(f"Precision: {precision}")
+    print(f"Recall (Sensitivity): {recall}")
+    print(f"F1-Score: {f1}")
+    
+    return metrics

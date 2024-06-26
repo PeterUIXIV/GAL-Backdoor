@@ -4,7 +4,7 @@ import datetime
 
 from matplotlib import pyplot as plt
 import json
-from anomaly import detect_anomalies
+from anomaly import detect_anomalies, get_anomaly_metrics_for_org
 from assi import Assi
 from mal_org import MalOrg
 import models
@@ -80,7 +80,9 @@ def runExperiment():
         elif cfg['attack'] == 'ftrojan':
             poison_agent = FtrojanAgent(poison_percent=poison_percent, poison_ratio=poison_ratio, target_class=target_class)
         else:
-            raise ValueError(f"Unsupported attack type: {cfg['attack']}")
+            raise ValueError(f"No valid attack type: {cfg['attack']}")
+    else:
+        poison_agent = None
         # dataset = poison_agent.poison_test_dataset(dataset=dataset, keep_org=True)
         
     organization = assist.make_organization(poison_agent)
@@ -135,14 +137,20 @@ def runExperiment():
         data_loader = assist.broadcast(dataset, epoch)
         train(data_loader, organization, metric, logger, epoch)
         organization_outputs = gather(data_loader, organization, epoch)
-        if cfg['poison_dataset']:
+        if cfg['attack'] is not None:
             manipulated_test_ids = load(os.path.join('./data/{}'.format(cfg['data_name']), 'poisoned', cfg['attack'], str(cfg['poison_percent']), 'indices.npy'), mode='np')
             print(f"# manipulated ids: {len(manipulated_test_ids)}")
         else:
             manipulated_test_ids = []
         manipulated_ids = [manipulated_test_ids if isinstance(org, MalOrg) else [] for org in organization]
         if cfg['detect_anomalies'] == True:
-            anomalies_by_org = detect_anomalies(organization_outputs, manipulated_ids)
+            anomalies_by_org = detect_anomalies(organization_outputs)
+            for i in range(len(anomalies_by_org)):
+                metrics = get_anomaly_metrics_for_org(anomalies_by_org[i], manipulated_ids[i])
+                logger.append(metrics, tag=f'org_{i}')
+                logger.write_anomaly_metrics(i, metrics, epoch)
+        else:
+            anomalies_by_org = [[] for _ in range(len(organization_outputs))]
         assist.update(organization_outputs, anomalies_by_org, epoch)
         test(assist, metric, logger, epoch)
         logger.safe(False)
@@ -153,6 +161,8 @@ def runExperiment():
             shutil.copy('./output/model/{}_checkpoint.pt'.format(cfg['model_tag']),
                         './output/model/{}_best.pt'.format(cfg['model_tag']))
         logger.reset()
+        
+        ## Plot image last epoch
         if epoch == cfg['global']['num_epochs']:
             targets = assist.organization_target[0]['test']
             # print(f"targets shape {targets.shape}")
@@ -167,8 +177,8 @@ def runExperiment():
             np_images = test_data.numpy()
             # show_images_with_labels(np_images, org_targets, 3, 3)
             # fig = plot_output_preds_target(test_data, org_targets, output, targets, 3, 3)
-            fig = plot_output_preds(test_data, targets, output, 3, 3)
-            plt.show()
+            # fig = plot_output_preds(test_data, targets, output, 3, 3)
+            # plt.show()
     logger.safe(False)
     return
 

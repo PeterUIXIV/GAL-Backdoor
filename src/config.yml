@@ -26,13 +26,13 @@ world_size: 1
 resume_mode: 0
 # backdoor
 backdoor:
-  # attack: None
+  attack: null
   # attack: 'ftrojan'
-  attack: 'badnet'
-  num_attackers: 1
+  # attack: 'badnet'
+  num_attackers: 0
   poison_percent: 0.04
   target_class: 2
-  poison_dataset: True
+  # poison_dataset: True
 mark:
   # badnet
   mark_path: 'apple_black.png'
@@ -45,6 +45,6 @@ mark:
   - [15, 15]
   magnitude: 30
 defense:
-  detect_anomalies: True
+  detect_anomalies: False
   # mode: 'svm'
   mode: 'isolation_forest'

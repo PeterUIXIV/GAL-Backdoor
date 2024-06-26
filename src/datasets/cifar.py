@@ -21,17 +21,19 @@ class CIFAR10(Dataset):
         self.root = os.path.expanduser(root)
         self.split = split
         self.transform = transform
-        self.poison = cfg['poison_dataset']
+        self.poison = cfg['attack']
         if not check_exists(self.processed_folder):
             self.process()
-        if not poison:
+        if self.poison is None:
             id, self.data, self.target = load(os.path.join(self.processed_folder, '{}.pt'.format(self.split)),
                                             mode='pickle')
             self.mal_target = np.copy(self.target)
-        elif poison:
+        elif self.poison == 'badnet' or self.poison == 'ftrojan':
             if not check_exists(self.poisoned_folder):
                 self.poison_dataset()
             id, self.data, self.target, self.mal_target = load(os.path.join(self.poisoned_folder, '{}.pt'.format(self.split)), mode='pickle')
+        else:
+            raise ValueError(f"No valid attack mode: {self.poison}")
         self.classes_counts = make_classes_counts(self.target)
         self.classes_to_labels, self.target_size = load(os.path.join(self.processed_folder, 'meta.pt'), mode='pickle')
         self.other = {'id': id}

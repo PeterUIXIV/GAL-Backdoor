@@ -7,7 +7,7 @@ from sklearn.metrics import roc_auc_score
 
 def Accuracy(output, target, mal_target, topk=1):
     with torch.no_grad():
-        if cfg['backdoor_test']:
+        if cfg['attack'] is not None:
             mask = target == mal_target
             output = output[mask]
             target = target[mask]
@@ -62,7 +62,7 @@ class Metric(object):
                 if cfg['data_name'] in ['Blob', 'Iris', 'Wine', 'BreastCancer', 'QSAR', 'MNIST', 'CIFAR10',
                                         'ModelNet40', 'ShapeNet55']:
                     metric_name[split] += ['Accuracy']
-                    if cfg['backdoor_test']:
+                    if cfg['attack'] is not None:
                         metric_name[split] += ['ASR']
                 elif cfg['data_name'] in ['MIMICM']:
                     metric_name[split] += ['AUCROC']

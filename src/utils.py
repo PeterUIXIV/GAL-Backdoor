@@ -255,10 +255,10 @@ def process_control():
     cfg['poison_percent'] = float(cfg['backdoor']['poison_percent'])
     cfg['poison_ratio'] = cfg['poison_percent'] / (1 - cfg['poison_percent'])
     cfg['target_class'] = int(cfg['backdoor']['target_class'])
-    cfg['poison_dataset'] = cfg['backdoor']['poison_dataset']
+    # cfg['poison_dataset'] = cfg['backdoor']['poison_dataset']
     ## Mark ##
     cfg['mark_path'] = cfg['mark']['mark_path']
-    cfg['backdoor_test'] = True
+    # cfg['backdoor_test'] = True
     cfg['mark_width_offset'] = int(cfg['mark']['width_offset'])
     cfg['YUV'] = cfg['mark']['YUV']
     cfg['channel_list'] = cfg['mark']['channel_list']

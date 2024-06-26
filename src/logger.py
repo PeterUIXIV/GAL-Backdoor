@@ -85,6 +85,11 @@ class Logger:
         self.writer.flush()
         return
     
+    def write_anomaly_metrics(self, org, metrics, epoch):
+        self.writer.add_scalar(f'org{org}/anomaly precision', metrics['precision'], epoch)
+        self.writer.add_scalar(f'org{org}/anomaly recall', metrics['recall'], epoch)
+        self.writer.add_scalar(f'org{org}/anomaly f1_score', metrics['f1_score'], epoch)
+    
     def writeFigure(self, net, inputs, labels, epoch, trainloader, i):
         self.writer.add_figure('predictions vs. actuals',
                             plot_classes_preds(net, inputs, labels),
