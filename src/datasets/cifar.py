@@ -7,7 +7,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 from poison.ftrojan import poison
 from poison.watermark import Watermark
-from utils import add_watermark, check_exists, makedir_exist_ok, numpy_to_torch, save, load, save_images_to_txt, show_images_with_labels, show_images_with_two_labels, torch_to_numpy
+from utils import add_watermark, check_exists, makedir_exist_ok, numpy_to_torch, save, load, save_images_to_txt, show_images_with_labels, show_images_with_labels_and_values, show_images_with_two_labels, torch_to_numpy
 from .utils import download_url, extract_file, make_classes_counts, make_tree, make_flat_index
 from config import cfg
 
@@ -88,12 +88,18 @@ class CIFAR10(Dataset):
         makedir_exist_ok(self.poisoned_folder)
         y_train_mal, y_test_mal = y_train.copy(), y_test.copy()
         if cfg['attack'] == 'ftrojan':
+            save_images_to_txt(x_test, y_test, 9, os.path.join(self.poisoned_folder, 'org_imgs'))
+            # x_test, y_test, y_test_mal = numpy_to_torch(x_test), numpy_to_torch(y_test), numpy_to_torch(y_test_mal)
+            # show_images_with_labels_and_values(x_test, y_test, y_test_mal, 3, 3)
+            # x_test, y_test, y_test_mal, = torch_to_numpy(x_test), torch_to_numpy(y_test), torch_to_numpy(y_test_mal)
             x_test = x_test.astype(np.float32) / 255.
             # x_train, y_train = poison(x_train, y_train)
-            save_images_to_txt(x_test, y_test, 9, "output/org")        
             x_test, y_test_mal, indices = poison(x_test, y_test_mal)
-            save_images_to_txt(x_test, y_test_mal, 9, "output/ftrojan")
             x_test = (x_test * 255).astype(np.uint8)
+            # x_test, y_test, y_test_mal = numpy_to_torch(x_test), numpy_to_torch(y_test), numpy_to_torch(y_test_mal)
+            # show_images_with_labels_and_values(x_test, y_test, y_test_mal, 3, 3)
+            # x_test, y_test_mal, = torch_to_numpy(x_test), torch_to_numpy(y_test_mal)
+            save_images_to_txt(x_test, y_test_mal, 9, os.path.join(self.poisoned_folder,'ftrojan_imgs'))
         elif cfg['attack'] == 'badnet':
             mark = Watermark(mark_path=cfg['mark_path'], data_shape=cfg['data_shape'], mark_width_offset=cfg['mark_width_offset'])
             x_test = x_test.astype(np.float32) / 255.

@@ -177,8 +177,8 @@ def runExperiment():
             np_images = test_data.numpy()
             # show_images_with_labels(np_images, org_targets, 3, 3)
             # fig = plot_output_preds_target(test_data, org_targets, output, targets, 3, 3)
-            # fig = plot_output_preds(test_data, targets, output, 3, 3)
-            # plt.show()
+            fig = plot_output_preds(test_data, targets, output, 3, 3)
+            plt.show()
     logger.safe(False)
     return
 

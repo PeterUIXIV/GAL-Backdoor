@@ -1,12 +1,15 @@
 import datetime
+import math
+import random
 import numpy as np
 import sys
 import time
 import torch
 import models
 from config import cfg
+from poison.ftrojan import poison, poison_frequency
 from poison.poison_agent import PoisonAgent
-from utils import show_images_with_labels_and_values, to_device, make_optimizer, make_scheduler, collate
+from utils import numpy_to_torch, show_images_with_labels_and_values, to_device, make_optimizer, make_scheduler, collate, torch_to_numpy
 
 classes = ('plane', 'car', 'bird', 'cat',
            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
@@ -100,8 +103,16 @@ class MalOrg:
                         #     print(f"org_label batch: {org_labels[indices]}")
                             np_images = input['data'].numpy()
                             # show_images_with_labels_and_values(np_images, labels, mal_labels, 3, 3)
-                            
+                    
+                    # images, labels = torch_to_numpy(images), torch_to_numpy(labels)
+                    # images = images.astype(np.float32) / 255.
+                    # # x_train, y_train = poison(x_train, y_train)
+                    # images, images, _ = poison(images, images)
+                    # images = (images * 255).astype(np.uint8)
+                    # images, labels = numpy_to_torch(images), numpy_to_torch(labels)
+                    
                     images, labels = self.poison_agent.poison(id=None, data=(images, labels), replace_org=True)
+                    # images, labels = self.poison(id=None, data=(images, labels), replace_org=True)
                     input['data'], input['target'] = images, labels
                     if i == 0:
                         if first_iter:
@@ -243,7 +254,7 @@ class MalOrg:
     #     if not org:
     #         if keep_org:
     #             # decimal, integer = math.modf(len(_label) * self.poison_percent)
-    #             decimal, integer = math.modf(len(_label) * self.poison_ratio)
+    #             decimal, integer = math.modf(len(_label) * cfg['poison_ratio'])
     #             integer = int(integer)
     #             if random.uniform(0, 1) < decimal:
     #                 integer += 1
@@ -255,7 +266,7 @@ class MalOrg:
     #             _label = _label[:integer]
     #             if poison_label:
     #                 _label = torch.zeros_like(org_label[:integer])
-    #                 _label[:integer, self.target_class] = 1
+    #                 _label[:integer, cfg['target_class']] = 1
     #                 # _label = self.target_class * torch.ones_like(org_label[:integer])
     #             if id is not None:
     #                 self.manipulated_ids.extend(id[:integer].tolist())

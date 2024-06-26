@@ -62,10 +62,6 @@ class PoisonAgent(ABC):
         _input, _label = data
         # _input size torch.Size([512, 3, 32, 32]) _input len 512
         # _label size torch.Size([512, 10]) _label len 512
-        single_image = False
-        if _label.dim() < 1:
-            single_image = True
-            _label = _label.unsqueeze(0)
         if not org:
             if keep_org:
                 # decimal, integer = math.modf(len(_label) * self.poison_percent)
@@ -77,29 +73,18 @@ class PoisonAgent(ABC):
                 integer = len(_label)
             if not keep_org or integer:
                 org_input, org_label = _input, _label
-                if single_image:
-                    _input = self.add_trigger(org_input)
-                    if poison_label:
-                        _label = self.target_class * torch.ones_like(org_label[:integer])
-                else:
-                    _input = self.add_trigger(org_input[:integer])
-                    _label = _label[:integer]
-                    if poison_label:
-                        _label = torch.zeros_like(org_label[:integer])
-                        _label[:integer, self.target_class] = 1
-                        # _label = self.target_class * torch.ones_like(org_label[:integer])
-                    if id is not None:
-                        self.manipulated_ids.extend(id[:integer].tolist())
-                    if replace_org:
-                        _input = torch.cat((_input, org_input[integer:]))
-                        _label = torch.cat((_label, org_label[integer:]))
-                    elif keep_org:
-                        _input = torch.cat((_input, org_input))
-                        _label = torch.cat((_label, org_label))
-                # TODO: möchte ich wirklich von 512 auf 1024 und die bilder behalten (verdoppeln)?
-                if keep_org and not single_image:
+                _input = self.add_trigger(org_input[:integer])
+                _label = _label[:integer]
+                if poison_label:
+                    _label = torch.zeros_like(org_label[:integer])
+                    _label[:integer, self.target_class] = 1
+                    # _label = self.target_class * torch.ones_like(org_label[:integer])
+                if id is not None:
+                    self.manipulated_ids.extend(id[:integer].tolist())
+                if replace_org:
+                    _input = torch.cat((_input, org_input[integer:]))
+                    _label = torch.cat((_label, org_label[integer:]))
+                elif keep_org:
                     _input = torch.cat((_input, org_input))
                     _label = torch.cat((_label, org_label))
-        if single_image:
-            _label = _label.squeeze(0)
         return _input, _label

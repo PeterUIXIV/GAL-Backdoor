@@ -26,11 +26,11 @@ world_size: 1
 resume_mode: 0
 # backdoor
 backdoor:
-  attack: null
-  # attack: 'ftrojan'
+  # attack: null
+  attack: 'ftrojan'
   # attack: 'badnet'
-  num_attackers: 0
-  poison_percent: 0.04
+  num_attackers: 1
+  poison_percent: 0.2
   target_class: 2
   # poison_dataset: True
 mark:

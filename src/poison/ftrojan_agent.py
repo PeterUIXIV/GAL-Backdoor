@@ -2,20 +2,19 @@ import numpy as np
 import torch
 from poison.ftrojan import poison_frequency
 from poison.poison_agent import PoisonAgent
+from utils import numpy_to_torch, show_images, show_images_with_labels_and_values, torch_to_numpy
 
 
 class FtrojanAgent(PoisonAgent):
     def __init__(self, poison_percent, poison_ratio, target_class):
-        super.__init__(poison_percent=poison_percent, poison_ratio=poison_ratio, target_class=target_class)
+        super().__init__(poison_percent=poison_percent, poison_ratio=poison_ratio, target_class=target_class)
         
     def add_trigger(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
         r"""Add watermark to input tensor.
         """
-        if x.is_cuda:
-            x = x.cpu()
-        np_array = x.numpy()
-        np_array = np.transpose(np_array , (0, 2, 3, 1))
+        np_array = torch_to_numpy(x)
+        # show_images(np_array, 3, 3)
         poisoned = poison_frequency(np_array, **kwargs)
-        poisoned = np.transpose(poisoned, (0, 3, 1, 2))
-        poisoned = torch.from_numpy(poisoned)
+        # show_images(poisoned, 3, 3)
+        poisoned = numpy_to_torch(poisoned)
         return poisoned

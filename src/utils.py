@@ -380,7 +380,10 @@ def collate(input):
 def show_images(images, nrows, ncols):
     fig, axes = plt.subplots(nrows, ncols, figsize=(10, 10))
     for i, ax in enumerate(axes.flat):
-        ax.imshow(np.transpose(images[i], (1, 2, 0)))
+        image = images[i]
+        if image.shape != (32, 32, 3):
+            image = np.transpose(image, (1, 2, 0))
+        ax.imshow(image)
         ax.axis('off')
     plt.show()
     
@@ -442,7 +445,7 @@ def show_images_with_labels_and_values(images, labels, values, nrows, ncols):
             value = classes[label_idx]
         else:
             value = classes[values[i].item()]
-        ax.set_title(f"Label: {label}\n value: {value}\n value: {label_idx}")
+        ax.set_title(f"Label: {label}\n value: {value}")
     plt.show()
     
 # def images_to_probs(net, images):
@@ -676,7 +679,7 @@ def show_image_with_two_labels(image_tensor, true_label, target_label):
     plt.show()
     
 def save_images_to_txt(images, labels, num, path):
-    images = images * 255.
+    makedir_exist_ok(path)
     for i in range(num):
         with open(f"{path}/img_{i}.txt", "w") as txt_file:
             for j in range(images[i].shape[0]):  # Iterate over the slices
