@@ -250,10 +250,10 @@ def process_control():
     cfg['global']['num_epochs'] = cfg['global_epoch']
     cfg['stats'] = make_stats()
     ## Backdoor ##
-    cfg['attack'] = cfg['backdoor']['attack']
-    cfg['num_attackers'] = int(cfg['backdoor']['num_attackers'])
-    cfg['poison_percent'] = float(cfg['backdoor']['poison_percent'])
-    cfg['poison_ratio'] = cfg['poison_percent'] / (1 - cfg['poison_percent'])
+    cfg['attack'] = cfg['attack']
+    cfg['num_attackers'] = int(cfg['num_attackers'])
+    cfg['poison_percentage'] = float(cfg['poison_percentage'])
+    cfg['poison_ratio'] = cfg['poison_percentage'] / (1 - cfg['poison_percentage'])
     cfg['target_class'] = int(cfg['backdoor']['target_class'])
     # cfg['poison_dataset'] = cfg['backdoor']['poison_dataset']
     ## Mark ##
@@ -265,8 +265,7 @@ def process_control():
     cfg['pos_list'] = cfg['mark']['pos_list']
     cfg['magnitude'] = int(cfg['mark']['magnitude'])
     ## Defense ##
-    cfg['detect_anomalies'] = cfg['defense']['detect_anomalies']
-    cfg['detect_mode'] = cfg['defense']['mode']
+    cfg['defense'] = cfg['defense']
     return
 
 
@@ -732,7 +731,7 @@ def add_watermark(mark: Watermark, data: tuple[torch.Tensor, torch.Tensor],
         #     _label = _label.unsqueeze(0)
         if not org:
             if keep_org:
-                # decimal, integer = math.modf(len(_label) * cfg['poison_percent'])                    
+                # decimal, integer = math.modf(len(_label) * cfg['poison_percentage'])                    
                 decimal, integer = math.modf(len(_label) * cfg['poison_ratio'])                    
                 integer = int(integer)
                 if random.uniform(0, 1) < decimal:

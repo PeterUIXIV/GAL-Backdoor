@@ -69,7 +69,7 @@ class CIFAR10(Dataset):
     
     @property
     def poisoned_folder(self):
-        return os.path.join(self.root, 'poisoned', cfg['attack'], str(cfg['poison_percent']))
+        return os.path.join(self.root, 'poisoned', cfg['attack'], str(cfg['poison_percentage']))
 
     def process(self):
         if not check_exists(self.raw_folder):

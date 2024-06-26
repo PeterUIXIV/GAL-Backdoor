@@ -25,12 +25,12 @@ device: cuda
 world_size: 1
 resume_mode: 0
 # backdoor
-backdoor:
   # attack: null
-  attack: 'ftrojan'
+attack: 'ftrojan'
   # attack: 'badnet'
-  num_attackers: 1
-  poison_percent: 0.2
+num_attackers: 1
+poison_percentage: 0.2
+backdoor:
   target_class: 2
   # poison_dataset: True
 mark:
@@ -44,7 +44,4 @@ mark:
   - [31, 31]
   - [15, 15]
   magnitude: 30
-defense:
-  detect_anomalies: False
-  # mode: 'svm'
-  mode: 'isolation_forest'
+defense: 'isolation_forest'

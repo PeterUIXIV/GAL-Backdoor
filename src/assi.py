@@ -1,7 +1,7 @@
 import copy
 import numpy as np
 import torch
-from anomaly import detect_anomalies, remove_anomalies
+from anomaly import remove_anomalies
 from mal_org import MalOrg
 import models
 from config import cfg

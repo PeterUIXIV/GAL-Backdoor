@@ -4,8 +4,8 @@ from poison.image import DCT, IDCT, RGB2YUV, YUV2RGB
 
 
 def poison(x_train, y_train):
-    target_label = cfg["target_class"]
-    num_images = int(cfg["poison_percent"] * y_train.shape[0])
+    target_label = cfg['target_class']
+    num_images = int(cfg['poison_percentage'] * y_train.shape[0])
 
     index = np.where(y_train != target_label)
     index = index[0]

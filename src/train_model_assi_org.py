@@ -71,7 +71,7 @@ def runExperiment():
     # assist = Assist(feature_split)
     
     if not cfg['attack'] == None:
-        poison_percent = cfg['poison_percent']
+        poison_percent = cfg['poison_percentage']
         poison_ratio = poison_percent / (1 - poison_percent)
         target_class = cfg['target_class']
         if cfg['attack'] == 'badnet':
@@ -122,10 +122,10 @@ def runExperiment():
             assist = result['assist']
             organization = result['organization']
         else:
-            logger = make_logger(os.path.join('output', 'runs', 'train_{}'.format(cfg['model_tag'])))
+            logger = make_logger(os.path.join('output', 'runs', str(cfg['attack']), str(cfg['defense']), 'train_{}'.format(cfg['model_tag'])))
     else:
         last_epoch = 1
-        logger = make_logger(os.path.join('output', 'runs', 'train_{}'.format(cfg['model_tag'])))
+        logger = make_logger(os.path.join('output', 'runs', str(cfg['attack']), str(cfg['defense']), 'train_{}'.format(cfg['model_tag'])))
     if organization is None:
         print("why this?")
         organization = assist.make_organization(poison_agent)
@@ -138,12 +138,12 @@ def runExperiment():
         train(data_loader, organization, metric, logger, epoch)
         organization_outputs = gather(data_loader, organization, epoch)
         if cfg['attack'] is not None:
-            manipulated_test_ids = load(os.path.join('./data/{}'.format(cfg['data_name']), 'poisoned', cfg['attack'], str(cfg['poison_percent']), 'indices.npy'), mode='np')
+            manipulated_test_ids = load(os.path.join('./data/{}'.format(cfg['data_name']), 'poisoned', cfg['attack'], str(cfg['poison_percentage']), 'indices.npy'), mode='np')
             print(f"# manipulated ids: {len(manipulated_test_ids)}")
         else:
             manipulated_test_ids = []
         manipulated_ids = [manipulated_test_ids if isinstance(org, MalOrg) else [] for org in organization]
-        if cfg['detect_anomalies'] == True:
+        if cfg['defense'] is not None:
             anomalies_by_org = detect_anomalies(organization_outputs)
             for i in range(len(anomalies_by_org)):
                 metrics = get_anomaly_metrics_for_org(anomalies_by_org[i], manipulated_ids[i])
@@ -155,11 +155,12 @@ def runExperiment():
         test(assist, metric, logger, epoch)
         logger.safe(False)
         save_result = {'cfg': cfg, 'epoch': epoch + 1, 'assist': assist, 'organization': organization, 'logger': logger}
-        save(save_result, './output/model/{}_checkpoint.pt'.format(cfg['model_tag']))
+        # save(save_result, './output/model/{}_checkpoint.pt'.format(cfg['model_tag']))
+        save(save_result, os.path.join('output', 'model', str(cfg['attack']), str(cfg['defense']), '{}_checkpoint.pt'.format(cfg['model_tag'])))
         if metric.compare(logger.mean['test/{}'.format(metric.pivot_name)]):
             metric.update(logger.mean['test/{}'.format(metric.pivot_name)])
-            shutil.copy('./output/model/{}_checkpoint.pt'.format(cfg['model_tag']),
-                        './output/model/{}_best.pt'.format(cfg['model_tag']))
+            shutil.copy(os.path.join('output', 'model', str(cfg['attack']), str(cfg['defense']), '{}_checkpoint.pt'.format(cfg['model_tag'])),
+                        os.path.join('output', 'model', str(cfg['attack']), str(cfg['defense']), '{}_best.pt'.format(cfg['model_tag'])))
         logger.reset()
         
         ## Plot image last epoch

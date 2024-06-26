@@ -25,7 +25,7 @@ def detect_anomalies(organization_outputs):
     X_train = concatenated_train_tensor.numpy()
     X_test = concatenated_test_tensor.numpy()
     
-    if cfg['detect_mode'] == 'isolation_forest':
+    if cfg['defense'] == 'isolation_forest':
         
         iso_forest = IsolationForest(contamination='auto', random_state=42)
         iso_forest.fit(X_train)
@@ -33,7 +33,7 @@ def detect_anomalies(organization_outputs):
         # Predict anomalies on the test data
         anomalies = iso_forest.predict(X_test)
         
-    elif cfg['detect_mode'] == 'svm':
+    elif cfg['defense'] == 'svm':
         # param_grid = {
         #     'nu': [0.01, 0.05, 0.1, 0.2],
         #     'gamma': ['scale', 'auto', 0.01, 0.1, 1]
@@ -82,15 +82,13 @@ def get_anomaly_metrics_for_org(anomalies_by_org, actual_malicious_indices):
     recall = recall_score(actuals, anomalies_by_org, zero_division=0.0)
     f1 = f1_score(actuals, anomalies_by_org, zero_division=0.0)
     
-    # Prepare the metrics dictionary
     metrics = {
         'precision': precision,
         'recall': recall,
         'f1_score': f1
     }
-    print(f"## Anomaly detection results org ##")
-    print(f"Precision: {precision}")
-    print(f"Recall (Sensitivity): {recall}")
-    print(f"F1-Score: {f1}")
-    
+    # print(f"## Anomaly detection results org ##")
+    # print(f"Precision: {precision}")
+    # print(f"Recall (Sensitivity): {recall}")
+    # print(f"F1-Score: {f1}")    
     return metrics
