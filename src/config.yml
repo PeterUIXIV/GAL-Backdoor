@@ -3,8 +3,8 @@
 control:
   num_users: '8'
   assist_mode: 'stack'
-  local_epoch: '10'
-  global_epoch: '10'
+  local_epoch: '2'
+  global_epoch: '2'
   assist_rate_mode: 'search'
   noise: '0'
   al: '0'
@@ -25,9 +25,9 @@ device: cuda
 world_size: 1
 resume_mode: 0
 # backdoor
-  # attack: null
+# attack: null
 attack: 'ftrojan'
-  # attack: 'badnet'
+# attack: 'badnet'
 num_attackers: 1
 poison_percentage: 0.2
 backdoor:
@@ -44,4 +44,5 @@ mark:
   - [31, 31]
   - [15, 15]
   magnitude: 30
-defense: 'isolation_forest'
+# defense: null
+defense: 'IF'

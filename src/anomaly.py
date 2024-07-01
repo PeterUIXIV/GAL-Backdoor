@@ -25,7 +25,7 @@ def detect_anomalies(organization_outputs):
     X_train = concatenated_train_tensor.numpy()
     X_test = concatenated_test_tensor.numpy()
     
-    if cfg['defense'] == 'isolation_forest':
+    if cfg['defense'] == 'IF':
         
         iso_forest = IsolationForest(contamination='auto', random_state=42)
         iso_forest.fit(X_train)

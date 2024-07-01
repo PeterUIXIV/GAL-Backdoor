@@ -45,13 +45,14 @@ cfg['control_name'] = '_'.join(
 def main():
     process_control()
     formatted_cfg = json.dumps(cfg, indent=4)
-    print(formatted_cfg)
+    for line in formatted_cfg.splitlines():
+        print(line)
     seeds = list(range(cfg['init_seed'], cfg['init_seed'] + cfg['num_experiments']))
     for i in range(cfg['num_experiments']):
         current_time = datetime.datetime.now()
         formatted_time = current_time.strftime("%b%d_%H-%M-%S")
         # model_tag_list = [str(seeds[i]), cfg['data_name'], cfg['model_name'], cfg['control_name'], formatted_time]
-        model_tag_list = [str(seeds[i]), cfg['data_name'], cfg['model_name'], cfg['control_name'], cfg['attack']]
+        model_tag_list = [str(seeds[i]), cfg['control_name'], str(cfg['poison_percentage']), str(cfg['num_attackers'])]
         
         cfg['model_tag'] = '_'.join([x for x in model_tag_list if x])
         print('Experiment: {}'.format(cfg['model_tag']))
@@ -178,8 +179,8 @@ def runExperiment():
             np_images = test_data.numpy()
             # show_images_with_labels(np_images, org_targets, 3, 3)
             # fig = plot_output_preds_target(test_data, org_targets, output, targets, 3, 3)
-            fig = plot_output_preds(test_data, targets, output, 3, 3)
-            plt.show()
+            # fig = plot_output_preds(test_data, targets, output, 3, 3)
+            # plt.show()
     logger.safe(False)
     return
 

@@ -7,7 +7,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 from poison.ftrojan import poison
 from poison.watermark import Watermark
-from utils import add_watermark, check_exists, makedir_exist_ok, numpy_to_torch, save, load, save_images_to_txt, show_images_with_labels, show_images_with_labels_and_values, show_images_with_two_labels, torch_to_numpy
+from utils import add_watermark, check_exists, makedir_exist_ok, numpy_to_torch, save, load, save_images_to_txt, show_images_with_two_labels, torch_to_numpy
 from .utils import download_url, extract_file, make_classes_counts, make_tree, make_flat_index
 from config import cfg
 
@@ -109,7 +109,7 @@ class CIFAR10(Dataset):
             print(f"First 9 indices {indices[:9]}")
             x_test, y_test_mal, = torch_to_numpy(x_test), torch_to_numpy(y_test_mal)
             x_test = (x_test * 255).astype(np.uint8)
-            show_images_with_two_labels(images, y_test[indices[:9]], labels, 3, 3)
+            # show_images_with_two_labels(images, y_test[indices[:9]], labels, 3, 3)
         
         save((indices), os.path.join(self.poisoned_folder, 'indices.npy'), mode='np')
         save((id_train, x_train, y_train, y_train_mal), os.path.join(self.poisoned_folder, 'train.pt'), mode='pickle')
