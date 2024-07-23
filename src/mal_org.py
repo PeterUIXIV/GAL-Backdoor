@@ -33,7 +33,7 @@ class MalOrg:
         else:
             train_target = torch.tensor(dataset['train'].target)
             test_target = torch.tensor(dataset['test'].target)
-            
+            test_mal_target = torch.tensor(dataset['test'].mal_target)            
         
         if train_target.dtype == torch.int64:
             if cfg['data_name'] in ['MIMICM']:
@@ -57,6 +57,7 @@ class MalOrg:
             evaluation = metric.evaluate(metric.metric_name['train'], input, output)
             logger.append(evaluation, 'train', n=train_target.size(0))
         input['target'], output['target'] = test_target, initialization['test']
+        input['mal_target'] = test_mal_target
         output['loss'] = models.loss_fn(output['target'], input['target'])
         if cfg['data_name'] in ['MIMICM']:
             mask = input['target'] != -65535

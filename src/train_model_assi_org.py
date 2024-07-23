@@ -45,8 +45,8 @@ cfg['control_name'] = '_'.join(
 def main():
     process_control()
     formatted_cfg = json.dumps(cfg, indent=4)
-    for line in formatted_cfg.splitlines():
-        print(line)
+    # for line in formatted_cfg.splitlines():
+    #     print(line)
     seeds = list(range(cfg['init_seed'], cfg['init_seed'] + cfg['num_experiments']))
     for i in range(cfg['num_experiments']):
         current_time = datetime.datetime.now()
@@ -87,12 +87,12 @@ def runExperiment():
         # dataset = poison_agent.poison_test_dataset(dataset=dataset, keep_org=True)
         
     organization = assist.make_organization(poison_agent)
-    print(f"Organization id: {organization[0].organization_id}")
-    print(f"Organization feature_split size: {organization[0].feature_split.size()}")
-    print(f"Organization model_name: {organization[0].model_name}")
-    print(f"MalOrg id: {organization[-1].organization_id}")
-    print(f"MalOrg feature_split size: {organization[-1].feature_split.size()}")
-    print(f"MalOrg model_name: {organization[-1].model_name}")
+    # print(f"Organization id: {organization[0].organization_id}")
+    # print(f"Organization feature_split size: {organization[0].feature_split.size()}")
+    # print(f"Organization model_name: {organization[0].model_name}")
+    # print(f"MalOrg id: {organization[-1].organization_id}")
+    # print(f"MalOrg feature_split size: {organization[-1].feature_split.size()}")
+    # print(f"MalOrg model_name: {organization[-1].model_name}")
     
     
     # altered_images = torch.stack([sample['data'] for sample in dataset['test']], dim=0)
@@ -128,10 +128,8 @@ def runExperiment():
         last_epoch = 1
         logger = make_logger(os.path.join('output', 'runs', str(cfg['attack']), str(cfg['defense']), 'train_{}'.format(cfg['model_tag'])))
     if organization is None:
-        print("why this?")
         organization = assist.make_organization(poison_agent)
     if last_epoch == 1:
-        print("Now init")
         initialize(dataset, assist, organization[0], metric, logger, 0)
     for epoch in range(last_epoch, cfg['global']['num_epochs'] + 1):
         logger.safe(True)

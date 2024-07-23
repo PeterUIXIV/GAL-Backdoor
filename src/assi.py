@@ -30,11 +30,8 @@ class Assi:
 
     def make_model_name(self):
         model_name_list = cfg['model_name'].split('-')
-        print(f"Model_name_list: {model_name_list}")
         num_split = cfg['num_users'] // len(model_name_list)
-        print(f"Num_split: {num_split}")
         rm_split = cfg['num_users'] - num_split * len(model_name_list)
-        print(f"Rm_split: {rm_split}")
         model_name = []
         for i in range(len(model_name_list)):
             model_name.extend([model_name_list[i] for _ in range(num_split)])

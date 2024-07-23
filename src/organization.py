@@ -21,7 +21,6 @@ class Organization:
     def initialize(self, dataset, metric, logger):
         input, output, initialization = {}, {}, {}
         print("Begnin Org init")
-        print(f"Data name {cfg['data_name']}")
         if cfg['data_name'] in ['MIMICL', 'MIMICM']:
             train_target = torch.tensor(np.concatenate(dataset['train'].target, axis=0))
             test_target = torch.tensor(np.concatenate(dataset['test'].target, axis=0))

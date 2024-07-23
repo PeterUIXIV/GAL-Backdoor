@@ -3,10 +3,28 @@ import yaml
 import itertools
 import subprocess
 
+done = 0
+
 def generate_param_combinations(param_grid):
     keys, values = zip(*param_grid.items())
     experiments = [dict(zip(keys, v)) for v in itertools.product(*values)]
-    return experiments
+    filtered_experiments = [
+        exp for exp in experiments 
+        if not ((exp['attack'] is None and exp['num_attackers'] != 0) or 
+                (exp['num_attackers'] == 0 and exp['attack'] is not None) or
+                (exp['attack'] is None and exp['poison_percentage'] !=0.02))
+    ]
+    return filtered_experiments
+
+def add_baseline_combinations():
+    specific_combination = {
+    'num_participants': 4,
+    'num_attackers': 1,
+    'assist_mode': 'stack',
+    'attack': 'ftrojan',
+    'poison_percentage': 0.2,
+    'defense': 'IF'
+}
 
 # Load the YAML file
 with open('parameters.yml', 'r') as file:
@@ -19,13 +37,19 @@ param_grid = params['param_grid']
 
 # Generate parameter combinations
 param_combinations = generate_param_combinations(param_grid)
+for line in param_combinations:
+    print(line)
 
 best_score = 0
 best_params = None
 
 python_executable = sys.executable
 
-for param_set in param_combinations:
+for idx, param_set in enumerate(param_combinations):
+    if idx < done:
+        continue
+    
+    print(f"Experiment [{idx+1}/{len(param_combinations)}]")
     # Construct the command to run the ML script with the current parameters
     cmd = [
         python_executable, 'train_model_assi_org.py',
