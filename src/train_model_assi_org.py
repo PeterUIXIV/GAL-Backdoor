@@ -137,20 +137,20 @@ def runExperiment():
         train(data_loader, organization, metric, logger, epoch)
         organization_outputs = gather(data_loader, organization, epoch)
         if cfg['attack'] is not None:
-            manipulated_test_ids = load(os.path.join('./data/{}'.format(cfg['data_name']), 'poisoned', cfg['attack'], str(cfg['poison_percentage']), 'indices.npy'), mode='np')
-            print(f"# manipulated ids: {len(manipulated_test_ids)}")
+            actual_manipulated_ids = load(os.path.join('./data/{}'.format(cfg['data_name']), 'poisoned', cfg['attack'], str(cfg['poison_percentage']), 'indices.npy'), mode='np')
+            print(f"# manipulated ids: {len(actual_manipulated_ids)}")
         else:
-            manipulated_test_ids = []
-        manipulated_ids = [manipulated_test_ids if isinstance(org, MalOrg) else [] for org in organization]
+            actual_manipulated_ids = []
+        manipulated_ids_by_org = [actual_manipulated_ids if isinstance(org, MalOrg) else [] for org in organization]
         if cfg['defense'] is not None:
-            anomalies_by_org = detect_anomalies(organization_outputs)
-            for i in range(len(anomalies_by_org)):
-                metrics = get_anomaly_metrics_for_org(anomalies_by_org[i], manipulated_ids[i])
+            pred_anomalies_by_org = detect_anomalies(organization_outputs)
+            for i in range(len(pred_anomalies_by_org)):
+                metrics = get_anomaly_metrics_for_org(pred_anomalies_by_org[i], manipulated_ids_by_org[i])
                 logger.append(metrics, tag=f'org_{i}')
                 logger.write_anomaly_metrics(i, metrics, epoch)
         else:
-            anomalies_by_org = [[] for _ in range(len(organization_outputs))]
-        assist.update(organization_outputs, anomalies_by_org, epoch)
+            pred_anomalies_by_org = [[] for _ in range(len(organization_outputs))]
+        assist.update(organization_outputs, pred_anomalies_by_org, epoch)
         test(assist, metric, logger, epoch)
         logger.safe(False)
         save_result = {'cfg': cfg, 'epoch': epoch + 1, 'assist': assist, 'organization': organization, 'logger': logger}

@@ -110,20 +110,20 @@ class Assi:
         if cfg['assist_mode'] == 'none':
             for split in organization_outputs[0]:
                 self.organization_output[epoch][split] = organization_outputs[0][split]
-        elif cfg['assist_mode'] == 'bag':
+        else:
             _organization_outputs = {split: [] for split in organization_outputs[0]}
             for split in organization_outputs[0]:
                 for i in range(len(organization_outputs)):
                     _organization_outputs[split].append(organization_outputs[i][split])
                 _organization_outputs[split] = torch.stack(_organization_outputs[split], dim=-1)
+                
+
+        if cfg['assist_mode'] == 'bag':            
             for split in organization_outputs[0]:
+                if not cfg['defense'] == None and split == 'test':
+                    _organization_outputs[split] = remove_anomalies(_organization_outputs[split], anomalies_by_org)
                 self.organization_output[epoch][split] = _organization_outputs[split].mean(dim=-1)
         elif cfg['assist_mode'] == 'stack':
-            _organization_outputs = {split: [] for split in organization_outputs[0]}
-            for split in organization_outputs[0]:
-                for i in range(len(organization_outputs)):
-                    _organization_outputs[split].append(organization_outputs[i][split])
-                _organization_outputs[split] = torch.stack(_organization_outputs[split], dim=-1)
             if 'train' in organization_outputs[0]:
                 input = {'output': _organization_outputs['train'],
                          'target': self.organization_target[epoch]['train']}
@@ -144,9 +144,8 @@ class Assi:
                 print(f"self.assist_parameters epoch {epoch}: {self.assist_parameters[epoch]}")
                 model.train(False)
                 for split in organization_outputs[0]:
-                    if split == 'test':
+                    if not cfg['defense'] == None and split == 'test':
                         _organization_outputs[split] = remove_anomalies(_organization_outputs[split], anomalies_by_org)
-                        
                     input = {'output': _organization_outputs[split],
                              'target': self.organization_target[epoch][split]}
                     input = to_device(input, cfg['device'])

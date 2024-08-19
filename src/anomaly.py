@@ -57,38 +57,54 @@ def detect_anomalies(organization_outputs):
         
     return anomalies_by_org
 
+# def remove_anomalies(organization_output_split, anomalies_by_org):
+#     anomalies_tensors = []
+#     for anomalies in anomalies_by_org:
+#         if len(anomalies) == 0:
+#             anomalies_tensors.append(None)
+#         else:
+#             anomalies_tensors.append(torch.tensor(anomalies, dtype=torch.bool))
+
+#     for org_idx, anomaly_mask in enumerate(anomalies_tensors):
+#         if anomaly_mask is not None:  
+#             # The shape of organization_output_split is [10000, 10, num_orgs]
+#             # So we need to unsqueeze to make anomaly_mask [10000, 1, 1] and then expand it
+#             expanded_anomaly_mask = anomaly_mask.unsqueeze(1).unsqueeze(2).expand(-1, 10, organization_output_split.size(2))
+#             organization_output_split[expanded_anomaly_mask] = 0
+
+#     return organization_output_split
+
 def remove_anomalies(organization_output_split, anomalies_by_org):
     anomalies_tensors = []
     for anomalies in anomalies_by_org:
         if len(anomalies) == 0:
-            anomalies_tensors.append(None)  # Use None to represent no anomalies
+            anomalies_tensors.append(None)
         else:
-            anomalies_tensors.append(torch.tensor(anomalies, dtype=torch.bool))
-
-    for org_idx, anomaly_mask in enumerate(anomalies_tensors):
-        if anomaly_mask is not None:  
-            # The shape of organization_output_split is [10000, 10, num_orgs]
-            # So we need to unsqueeze to make anomaly_mask [10000, 1, 1] and then expand it
-            expanded_anomaly_mask = anomaly_mask.unsqueeze(1).unsqueeze(2).expand(-1, 10, organization_output_split.size(2))
-            organization_output_split[expanded_anomaly_mask] = 0
-
-
+            anomaly_mask = torch.tensor(anomalies, dtype=torch.bool)
+            extended_mask = anomaly_mask.unsqueeze(1).expand(-1, 10)
+            anomalies_tensors.append(extended_mask)
+    anomalies_stack = torch.stack(anomalies_tensors, dim=2)
+    
+    organization_output_split[anomalies_stack] = 0
+    
     return organization_output_split
 
-def get_anomaly_metrics_for_org(anomalies_by_org, actual_malicious_indices):
-    actuals = np.zeros(len(anomalies_by_org), dtype=int)
+def get_anomaly_metrics_for_org(pred_anomalies, actual_malicious_indices):
+    actuals = np.zeros(len(pred_anomalies), dtype=int)
     actuals[actual_malicious_indices] = 1
-    precision = precision_score(actuals, anomalies_by_org, zero_division=0.0)
-    recall = recall_score(actuals, anomalies_by_org, zero_division=0.0)
-    f1 = f1_score(actuals, anomalies_by_org, zero_division=0.0)
+    precision = precision_score(actuals, pred_anomalies, zero_division=0.0)
+    recall = recall_score(actuals, pred_anomalies, zero_division=0.0)
+    f1 = f1_score(actuals, pred_anomalies, zero_division=0.0)
     
     metrics = {
         'precision': precision,
         'recall': recall,
-        'f1_score': f1
+        'f1_score': f1,
+        '#mal_predictions': np.count_nonzero(pred_anomalies==1),
+        '#correct_predictions': np.sum(np.logical_and(actuals, pred_anomalies))
     }
     # print(f"## Anomaly detection results org ##")
     # print(f"Precision: {precision}")
-    # print(f"Recall (Sensitivity): {recall}")
+    print(f"Recall (Sensitivity): {recall}")
     # print(f"F1-Score: {f1}")    
     return metrics

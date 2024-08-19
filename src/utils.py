@@ -265,7 +265,7 @@ def process_control():
     cfg['pos_list'] = cfg['mark']['pos_list']
     cfg['magnitude'] = int(cfg['mark']['magnitude'])
     ## Defense ##
-    cfg['defense'] = None if cfg['defense'] == 'None' else cfg['defense']
+    cfg['defense'] = None if cfg['defense'] == 'None' or cfg['defense'] == 'none' or cfg['defense'] == 'null' else cfg['defense']
     return
 
 
