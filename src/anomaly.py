@@ -28,7 +28,7 @@ def detect_anomalies(organization_outputs):
     if cfg['defense'] == 'IF':
         
         iso_forest = IsolationForest(contamination='auto', random_state=42)
-        iso_forest.fit(X_train)
+        iso_forest.fit(X_test)
         
         # Predict anomalies on the test data
         anomalies = iso_forest.predict(X_test)

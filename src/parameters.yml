@@ -1,7 +1,7 @@
 param_grid:
   num_participants: [2, 4, 8]
-  num_attackers: [1, 2, 0]
+  num_attackers: [1]
   assist_mode: ['bag', 'stack']
-  attack: ['badnet', 'ftrojan', null]
+  attack: ['badnet', 'ftrojan']
   poison_percentage: [0.02, 0.2]
-  defense: [null, 'IF'] 
+  defense: ['IF'] 

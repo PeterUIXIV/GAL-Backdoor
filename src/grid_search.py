@@ -16,16 +16,6 @@ def generate_param_combinations(param_grid):
     ]
     return filtered_experiments
 
-def add_baseline_combinations():
-    specific_combination = {
-    'num_participants': 4,
-    'num_attackers': 1,
-    'assist_mode': 'stack',
-    'attack': 'ftrojan',
-    'poison_percentage': 0.2,
-    'defense': 'IF'
-}
-
 # Load the YAML file
 with open('parameters.yml', 'r') as file:
     params = yaml.safe_load(file)
