@@ -59,20 +59,22 @@ def process_folder_for_tags(folder_path, tag_data, root_dir):
             # Group data by tag
             for tag in scalar_data['tag'].unique():
                 tag_specific_data = scalar_data[scalar_data['tag'] == tag][['step', 'value']]
+                tag_specific_data = tag_specific_data.set_index('step')
                 tag_specific_data = tag_specific_data.rename(columns={'value': relative_path})
-                # tag_specific_data = tag_specific_data.set_index('step')
-
-                # Use the folder path as the column name
 
                 if tag in tag_data:
-                    required_columns = tag_data[tag].columns
-                    tag_specific_data = ensure_columns(tag_specific_data, required_columns)
-                    # tag_data[tag][relative_path] = tag_specific_data['value']
-                    # tag_data[tag][relative_path] = pd.concat([tag_data[tag], tag_specific_data['value']])
-                    tag_data[tag] = pd.concat([tag_data[tag], tag_specific_data], ignore_index=True)
+                    if relative_path in tag_data[tag]:
+                        max_step_tag_specific = tag_specific_data.index.max()
+                        if max_step_tag_specific > len(tag_data[tag].index):
+                            tag_data[tag] = tag_data[tag].reindex(range(1, max_step_tag_specific + 1))
+                            tag_data[tag].update(tag_specific_data)
+                        else:
+                            tag_data[tag].update(tag_specific_data)
+                    else:
+                        tag_data[tag] = pd.concat([tag_data[tag], tag_specific_data], axis=1)
                 else:
-                    # tag_data[tag] = tag_specific_data.rename(columns={'value': relative_path})
                     tag_data[tag] = tag_specific_data
+
 
 def write_tag_data_to_csv(tag_data, parent_folder):
     """
