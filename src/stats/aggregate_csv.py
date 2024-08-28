@@ -52,6 +52,7 @@ def process_folder_for_tags(folder_path, tag_data, root_dir):
     event_files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.startswith('events.out.tfevents')]
     
     relative_path = os.path.relpath(folder_path, root_dir)
+    column_name = relative_path.replace("/", " ").replace("\\", " ").replace("_", " ")
     if event_files:  # Only process if there are event files in the folder
         for event_file in event_files:
             scalar_data = extract_scalar_data(event_file)
@@ -60,10 +61,10 @@ def process_folder_for_tags(folder_path, tag_data, root_dir):
             for tag in scalar_data['tag'].unique():
                 tag_specific_data = scalar_data[scalar_data['tag'] == tag][['step', 'value']]
                 tag_specific_data = tag_specific_data.set_index('step')
-                tag_specific_data = tag_specific_data.rename(columns={'value': relative_path})
+                tag_specific_data = tag_specific_data.rename(columns={'value': column_name})
 
                 if tag in tag_data:
-                    if relative_path in tag_data[tag]:
+                    if column_name in tag_data[tag]:
                         max_step_tag_specific = tag_specific_data.index.max()
                         if max_step_tag_specific > len(tag_data[tag].index):
                             tag_data[tag] = tag_data[tag].reindex(range(1, max_step_tag_specific + 1))
@@ -106,6 +107,6 @@ def walk_through_folders_and_collect_data(root_dir):
     write_tag_data_to_csv(tag_data, root_dir)
 
 if __name__ == "__main__":
-    root_directory = "output/runs"  # replace with the path to your root directory
+    root_directory = "src/output/runs"  # replace with the path to your root directory
     
     walk_through_folders_and_collect_data(root_directory)
