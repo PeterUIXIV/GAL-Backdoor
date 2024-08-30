@@ -97,6 +97,6 @@ def walk_through_folders(root_dir):
             process_folder(dirpath)
 
 if __name__ == "__main__":
-    root_directory = "output"  # replace with the path to your root directory
+    root_directory = "output/runs"  # replace with the path to your root directory
     
     walk_through_folders(root_directory)

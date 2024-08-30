@@ -35,12 +35,6 @@ def extract_scalar_data(event_file):
 
     return pd.DataFrame(scalar_data)
 
-def ensure_columns(df, required_columns):
-    for col in required_columns:
-        if col not in df.columns:
-            df[col] = pd.NA
-    return df
-
 def process_folder_for_tags(folder_path, tag_data, root_dir):
     """
     Process all TensorBoard event files in a given folder and organize data by tag.
