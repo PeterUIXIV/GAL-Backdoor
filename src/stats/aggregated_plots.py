@@ -1,8 +1,10 @@
 import itertools
+from pathlib import Path
 from matplotlib import pyplot as plt
 from tensorboard.backend.event_processing import event_accumulator
 import pandas as pd
 import os
+import json
 
 def extract_scalar_data(event_file):
     """
@@ -118,6 +120,9 @@ def plot_combinations(params, tag_data, output_dir):
             for tag, df in tag_data.items():
                 plot_columns(tag, df, column_names, output_dir, param, comb)
 
+def dict_to_string_no_special_chars(d):
+    return ' '.join([f'{key} {value}' for key, value in d.items()])
+
 def plot_columns(tag, df, column_names, output_dir, param, comb):
 
     for column in column_names:
@@ -134,12 +139,9 @@ def plot_columns(tag, df, column_names, output_dir, param, comb):
     plt.title(f'{tag} {param} {comb} over Steps')
     plt.legend()
 
-    # Save the plot
-    print(tag)
-    print(output_dir)
+    tag = tag.replace("/", "_")
+    comb = dict_to_string_no_special_chars(comb)
     output_path = os.path.join(output_dir, f'{tag}_{param}_{comb} plot.png')
-    print(output_path)
-    plt.show()
     plt.savefig(output_path)
     plt.close()
     print(f"Plot saved to {output_path}")
@@ -167,7 +169,9 @@ def walk_through_folders_and_collect_data(root_dir):
         if any(f.startswith('events.out.tfevents') for f in filenames):
             process_folder_for_tags(dirpath, tag_data, root_dir, params)
     
-    plot_combinations(params, tag_data, root_dir)
+    output_dir = os.path.join(root_directory, "plots")
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    plot_combinations(params, tag_data, output_dir)
     # plot_data(tag_data, root_dir)
 
 if __name__ == "__main__":
