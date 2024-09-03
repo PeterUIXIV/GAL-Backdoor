@@ -104,10 +104,11 @@ def plot_combinations(params, tag_data, output_dir):
     for param, values in params.items():
         combs = create_combinations(params, exclude_param=param)
         # file_name = '{} {}'.format(param, '-'.join(values))
-
         for comb in combs:
             column_names = []
+            ordered_values = []
             for value in values:
+                ordered_values.append(value)
                 comb[param] = value
                 column_name = '{} {} train 0 {} {} 10 10 search 0 {} {}'.format(comb['attack'], 
                                                                                 comb['defense'], 
@@ -116,14 +117,15 @@ def plot_combinations(params, tag_data, output_dir):
                                                                                 comb['poison_percentage'], 
                                                                                 comb['num_attacker'])
                 column_names.append(column_name)
-            
+            del comb[param]
+
             for tag, df in tag_data.items():
-                plot_columns(tag, df, column_names, output_dir, param, comb)
+                plot_columns(tag, df, column_names, output_dir, param, comb, ordered_values)
 
 def dict_to_string_no_special_chars(d):
     return ' '.join([f'{key} {value}' for key, value in d.items()])
 
-def plot_columns(tag, df, column_names, output_dir, param, comb):
+def plot_columns(tag, df, column_names, output_dir, param, comb, values):
 
     for column in column_names:
         if column not in df.columns:
@@ -131,17 +133,32 @@ def plot_columns(tag, df, column_names, output_dir, param, comb):
             return
     
     plt.figure(figsize=(10, 6))
+    if tag == ('test/Accuracy' or 'test/ASR' or 'test/Loss' or 'train/Loss'):
+        plt.ylim(0, 100)
+    elif 'Anomaly' in tag:
+        plt.ylim(0, 1)
+    else:
+        print("ylim not set")
 
-    for column in column_names:
-        plt.plot(df.index, df[column], marker='o', label=column)
 
+    for idx, column in enumerate(column_names):
+        label = f'{param}: {values[idx]}'
+        plt.plot(df.index, df[column], marker='o', label=label)
+
+    tag_clean = tag.replace("/", "_")
+    plt.ylabel(tag_clean.replace("_", " "))
     plt.xlabel('Step')
-    plt.title(f'{tag} {param} {comb} over Steps')
-    plt.legend()
+    if comb['attack'] == 'None':
+        comb['poison_percentage'] = 0
 
-    tag = tag.replace("/", "_")
+    # plt.title(f'{tag_clean} {param}\n{comb} over Steps')
+    if tag_clean == ('test_Accuracy' or 'ASR'):
+        plt.legend(loc="lower right")
+    else:
+        plt.legend()
+
     comb = dict_to_string_no_special_chars(comb)
-    output_path = os.path.join(output_dir, f'{tag}_{param}_{comb} plot.png')
+    output_path = os.path.join(output_dir, f'{tag_clean}_{param} {comb} plot.png')
     plt.savefig(output_path)
     plt.close()
     print(f"Plot saved to {output_path}")
