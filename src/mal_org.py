@@ -111,8 +111,8 @@ class MalOrg:
                     # images, images, _ = poison(images, images)
                     # images = (images * 255).astype(np.uint8)
                     # images, labels = numpy_to_torch(images), numpy_to_torch(labels)
-                    
-                    images, labels = self.poison_agent.poison(id=None, data=(images, labels), replace_org=True)
+                    if self.poison_agent is not None:
+                        images, labels = self.poison_agent.poison(id=None, data=(images, labels), replace_org=True)
                     # images, labels = self.poison(id=None, data=(images, labels), replace_org=True)
                     input['data'], input['target'] = images, labels
                     if i == 0:
