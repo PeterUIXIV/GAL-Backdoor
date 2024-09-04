@@ -35,8 +35,9 @@ backdoor:
   # poison_dataset: True
 mark:
   # badnet
-  mark_path: 'apple_black.png'
+  mark_path: 'square_white.png'
   width_offset: -4
+  height_offset: -4
   # ftrojan
   YUV: True
   channel_list: [1, 2]

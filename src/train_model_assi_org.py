@@ -76,7 +76,7 @@ def runExperiment():
         poison_ratio = poison_percent / (1 - poison_percent)
         target_class = cfg['target_class']
         if cfg['attack'] == 'badnet':
-            mark = Watermark(mark_path=cfg['mark_path'], data_shape=cfg['data_shape'], mark_width_offset=cfg['mark_width_offset'])
+            mark = Watermark(mark_path=cfg['mark_path'], data_shape=cfg['data_shape'], mark_width_offset=cfg['mark_width_offset'], mark_height_offset=cfg['mark_height_offset'])
             poison_agent = BadnetAgent(poison_percent=poison_percent, poison_ratio=poison_ratio, target_class=target_class, mark=mark)
         elif cfg['attack'] == 'ftrojan':
             poison_agent = FtrojanAgent(poison_percent=poison_percent, poison_ratio=poison_ratio, target_class=target_class)

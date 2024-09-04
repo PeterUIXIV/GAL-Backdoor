@@ -250,7 +250,7 @@ def process_control():
     cfg['global']['num_epochs'] = cfg['global_epoch']
     cfg['stats'] = make_stats()
     ## Backdoor ##
-    cfg['attack'] = None if cfg['attack'] == 'None' else cfg['attack']
+    cfg['attack'] = None if cfg['attack'] == 'None' or cfg['attack'] == 'none' or cfg['attack'] == 'null' else cfg['attack']
     cfg['num_attackers'] = int(cfg['num_attackers'])
     cfg['poison_percentage'] = float(cfg['poison_percentage'])
     cfg['poison_ratio'] = cfg['poison_percentage'] / (1 - cfg['poison_percentage'])
@@ -260,6 +260,7 @@ def process_control():
     cfg['mark_path'] = cfg['mark']['mark_path']
     # cfg['backdoor_test'] = True
     cfg['mark_width_offset'] = int(cfg['mark']['width_offset'])
+    cfg['mark_height_offset'] = int(cfg['mark']['height_offset'])
     cfg['YUV'] = cfg['mark']['YUV']
     cfg['channel_list'] = cfg['mark']['channel_list']
     cfg['pos_list'] = cfg['mark']['pos_list']
