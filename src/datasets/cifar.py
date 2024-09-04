@@ -101,7 +101,7 @@ class CIFAR10(Dataset):
             # x_test, y_test_mal, = torch_to_numpy(x_test), torch_to_numpy(y_test_mal)
             save_images_to_txt(x_test, y_test_mal, 9, os.path.join(self.poisoned_folder,'ftrojan_imgs'))
         elif cfg['attack'] == 'badnet':
-            mark = Watermark(mark_path=cfg['mark_path'], data_shape=cfg['data_shape'], mark_width_offset=cfg['mark_width_offset'])
+            mark = Watermark(mark_path=cfg['mark_path'], data_shape=cfg['data_shape'], mark_width_offset=cfg['mark_width_offset'], mark_height_offset=cfg['mark_height_offset'])
             x_test = x_test.astype(np.float32) / 255.
             x_test, y_test_mal = numpy_to_torch(x_test), numpy_to_torch(y_test_mal)
             x_test, y_test_mal, indices = add_watermark(mark=mark, data=(x_test, y_test_mal), keep_org=True)

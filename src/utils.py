@@ -260,6 +260,7 @@ def process_control():
     cfg['mark_path'] = cfg['mark']['mark_path']
     # cfg['backdoor_test'] = True
     cfg['mark_width_offset'] = int(cfg['mark']['width_offset'])
+    cfg['mark_height_offset'] = int(cfg['mark']['height_offset'])
     cfg['YUV'] = cfg['mark']['YUV']
     cfg['channel_list'] = cfg['mark']['channel_list']
     cfg['pos_list'] = cfg['mark']['pos_list']

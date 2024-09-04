@@ -44,10 +44,12 @@ class Conv(nn.Module):
             x = feature_split(x, input['feature_split'])
         
         # np_images = x.cpu().numpy()
-        # if np_images[0][0][0][30].item() != 0:
+        # if np_images[0][0][30][30].item() != 0:
+        #     print("Feature split")
+        #     print(input['feature_split'])
         #     print(f"[0][0][0][30] {np_images[0][0][0][30].item()}")
         #     print(f"first np_image: {np_images[0]}, shape: {np_images[0].shape}")
-        #     show_images_with_labels_and_values(np_images, input['target'], input['org_target'], 3, 3)
+        #     show_images_with_labels_and_values(np_images, input['target'], input['mal_target'], 3, 3)
         x = self.blocks(x)
         output['target'] = self.linear(x)
         if 'target' in input:
