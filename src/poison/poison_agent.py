@@ -11,38 +11,49 @@ from config import cfg
 class PoisonAgent(ABC):
     def __init__(self, poison_percent, poison_ratio, target_class):
         self.poison_percent = poison_percent
-        self.poison_ratio = poison_ratio or self.poison_percent / (1 - self.poison_percent)
+        self.poison_ratio = poison_ratio or self.poison_percent / (
+            1 - self.poison_percent
+        )
         self.target_class = target_class
         self.manipulated_ids = []
-    
+
     @abstractmethod
     def add_trigger(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
-        r"""Add watermark to input tensor.
-        """
+        r"""Add watermark to input tensor."""
         pass
-    
+
     def poison_test_dataset(self, dataset, keep_org):
         fail_count = 0
-        for i, sample in enumerate(dataset['test']):
-            id = sample['id']
-            altered_data, altered_target = self.poison(id=id, data=(sample['data'], sample['target']), keep_org=keep_org)
-            numpy_img = (altered_data.numpy() * 255).astype(np.uint8)  
+        for i, sample in enumerate(dataset["test"]):
+            id = sample["id"]
+            altered_data, altered_target = self.poison(
+                id=id, data=(sample["data"], sample["target"]), keep_org=keep_org
+            )
+            numpy_img = (altered_data.numpy() * 255).astype(np.uint8)
             numpy_lbl = altered_target.numpy()
             # show_image_with_two_labels(scaled_img , altered_target)
-            numpy_img = np.transpose(numpy_img , (1, 2, 0))
+            numpy_img = np.transpose(numpy_img, (1, 2, 0))
             # dataset['test'].replace_org_target(i, sample['target'])
-            dataset['test'].replace_image(i, numpy_img)
-            dataset['test'].replace_target(i, numpy_lbl)
-            if dataset['test'][i]['target'] != cfg['target_class']:
+            dataset["test"].replace_image(i, numpy_img)
+            dataset["test"].replace_target(i, numpy_lbl)
+            if dataset["test"][i]["target"] != cfg["target_class"]:
                 fail_count += 1
-                print(f"FAIL: {fail_count}, sample: {sample['target']}, sampe type {type(sample['target'])}, i: {i}")
+                print(
+                    f"FAIL: {fail_count}, sample: {sample['target']}, sampe type {type(sample['target'])}, i: {i}"
+                )
             # show_image_with_two_labels(dataset['test'][i]['data'], dataset['test'][i]['target'], dataset['test'][i]['org_target'])
         return dataset
-        
-    def poison(self, id, data: Tuple[torch.Tensor, torch.Tensor],
-                 org: bool = False, keep_org: bool = True,
-                 poison_label: bool = True, replace_org: bool = True, **kwargs
-                 ) -> Tuple[torch.Tensor, torch.Tensor]:
+
+    def poison(
+        self,
+        id,
+        data: Tuple[torch.Tensor, torch.Tensor],
+        org: bool = False,
+        keep_org: bool = True,
+        poison_label: bool = True,
+        replace_org: bool = True,
+        **kwargs,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         r"""addWatermark.
 
         Args:
@@ -64,8 +75,8 @@ class PoisonAgent(ABC):
         # _label size torch.Size([512, 10]) _label len 512
         if not org:
             if keep_org:
-                # decimal, integer = math.modf(len(_label) * self.poison_percent)
-                decimal, integer = math.modf(len(_label) * self.poison_ratio)
+                decimal, integer = math.modf(len(_label) * self.poison_percent)
+                # decimal, integer = math.modf(len(_label) * self.poison_ratio)
                 integer = int(integer)
                 if random.uniform(0, 1) < decimal:
                     integer += 1
