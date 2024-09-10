@@ -173,21 +173,42 @@ def plot_columns(tag, df, column_names, output_dir, param, comb, values):
 
     for column in column_names:
         if column not in df.columns:
-            print(f"Column '{column}' does not exist in the DataFrame.")
+            # print(f"Column '{column}' does not exist in the DataFrame.")
             return
 
     plt.figure(figsize=(10, 6))
     if tag in ("test/Accuracy", "test/ASR"):
-        plt.ylim(0, 100)
+        y_min = 0
+        y_max = 100
+        margin = (y_max - y_min) * 0.05
+        plt.ylim(y_min - margin, y_max + margin)
     elif tag in ("test/Loss", "train/Loss"):
         pass
     elif "anomaly" in tag:
-        plt.ylim(0, 1)
+        y_min = 0
+        y_max = 1
+        margin = (y_max - y_min) * 0.05
     else:
         print(f"ylim not set, tag: {tag}")
 
-    for idx, column in enumerate(column_names):
-        label = f"{param}: {values[idx]}"
+    def int_or_str(value):
+        try:
+            return (
+                0,
+                int(value),
+            )
+        except (ValueError, TypeError):
+            return (
+                1,
+                str(value),
+            )
+
+    zipped_data = zip(values, column_names, range(len(column_names)))
+
+    sorted_data = sorted(zipped_data, key=lambda x: int_or_str(x[0]))
+
+    for value, column, idx in sorted_data:
+        label = f"{param}: {value}"
         plt.plot(df.index - 1, df[column], marker="o", label=label)
 
     tag_clean = tag.replace("/", "_")
@@ -197,7 +218,7 @@ def plot_columns(tag, df, column_names, output_dir, param, comb, values):
         comb["poison_percentage"] = 0
 
     # plt.title(f'{tag_clean} {param}\n{comb} over Steps')
-    if tag_clean in ("test_Accuracy", "ASR"):
+    if tag_clean in ("test_Accuracy", "test_ASR"):
         plt.legend(loc="lower right")
     else:
         plt.legend()
